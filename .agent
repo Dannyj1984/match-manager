@@ -1,0 +1,1 @@
+Project Scope: FairPlay Football Manager Context: This project uses Nuxt 3 and .NET 8. Logic Priority: Use the Snake Draft algorithm for balancing and the 80/20 weighted average for ratings. Restriction: Do not apply these architectural standards to any files outside the /footy directory.
