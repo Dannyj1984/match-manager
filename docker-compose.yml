@@ -1,0 +1,18 @@
+# Local PostgreSQL Development
+# Run: docker-compose up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fairplay-db
+    environment:
+      POSTGRES_USER: fairplay_user
+      POSTGRES_PASSWORD: fairplay_password
+      POSTGRES_DB: fairplay_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

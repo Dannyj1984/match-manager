@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+.output/
+.nuxt/
+.env
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.log
+
+# Databases
+postgres_data/
+
+# OS
+.DS_Store
+Thumbs.db

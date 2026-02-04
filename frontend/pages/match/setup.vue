@@ -1,0 +1,205 @@
+<script setup lang="ts">
+import { useMatchStore } from '@/stores/match'
+import { Users, Wand2, Play, Plus, Save, Calendar as CalendarIcon, Search, CheckCircle2, Star } from 'lucide-vue-next'
+
+const store = useMatchStore()
+const { data } = useAuth()
+const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
+
+const route = useRoute()
+
+onMounted(async () => {
+  await store.fetchPlayers()
+
+  // Fetch current user's player ID
+  const me = await store.fetchMe()
+  if (me) {
+    store.currentPlayerId = me.id
+  }
+
+  if (route.query.date) {
+    store.matchDate = route.query.date as string
+  }
+
+  // Initial fetch for selected date
+  await store.fetchMatchByDate(store.matchDate)
+})
+
+const handleGenerateTeams = async () => {
+  await store.generateTeams()
+}
+
+const handleSaveMatch = async () => {
+  const result = await store.saveMatch()
+  if (result.success) {
+    alert('Match saved successfully!')
+  } else {
+    alert(result.error)
+  }
+}
+
+const onDateChange = async () => {
+  await store.fetchMatchByDate(store.matchDate)
+}
+
+const showRatingModal = ref(false)
+
+const handleCompleteMatch = async () => {
+  const matchId = store.currentMatchId
+  if (!matchId) return
+
+  if (!confirm('Are you sure you want to complete this match? Ratings will be locked and player averages updated.')) return
+
+  const result = await store.completeMatch(matchId)
+  if (result.success) {
+    alert('Match completed successfully!')
+    await store.fetchMatchByDate(store.matchDate)
+  } else {
+    alert(result.error)
+  }
+}
+
+definePageMeta({
+  middleware: 'auth'
+})
+</script>
+
+<template>
+  <div class="max-w-[1600px] mx-auto px-4 py-8 md:py-12 space-y-8">
+    <!-- Header Section -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div class="space-y-2">
+        <div class="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-widest">
+          <div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+          {{ isAdmin ? 'Match Setup' : 'Match Archive' }}
+        </div>
+        <h1 class="text-4xl md:text-5xl font-black text-white tracking-tight">FAIRPLAY <span class="text-slate-500">{{
+          isAdmin ? 'DRAFT' : 'RESULTS' }}</span></h1>
+      </div>
+
+      <!-- Main Config Bar -->
+      <div class="glass-card p-4 flex flex-wrap items-center gap-6 border-white/5">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Match Date</label>
+          <div class="relative group">
+            <CalendarIcon :size="14"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors" />
+            <input v-model="store.matchDate" type="date" @change="onDateChange"
+              class="bg-slate-900/50 border border-white/5 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all cursor-pointer">
+          </div>
+        </div>
+
+        <div v-if="isAdmin" class="space-y-1.5 flex flex-col">
+          <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Team Count</label>
+          <select v-model="store.teamsCount"
+            class="bg-slate-900/50 border border-white/5 rounded-xl py-2 px-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all cursor-pointer min-w-[100px]">
+            <option :value="2">2 Teams</option>
+            <option :value="3">3 Teams</option>
+            <option :value="4">4 Teams</option>
+          </select>
+        </div>
+
+        <div v-if="isAdmin" class="h-10 w-px bg-white/5 hidden md:block"></div>
+
+        <div v-if="isAdmin" class="flex items-center gap-2">
+          <button v-if="!store.isCompleted" @click="handleGenerateTeams"
+            :disabled="store.selectedPlayerIds.length === 0 || store.isLoading"
+            class="flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg shadow-primary/20 active:scale-95 whitespace-nowrap">
+            <Wand2 :size="16" :class="{ 'animate-spin': store.isLoading }" />
+            GENERATE TEAMS
+          </button>
+          <button v-if="!store.isCompleted" @click="handleSaveMatch"
+            :disabled="Object.keys(store.teams).length === 0 || store.isLoading"
+            class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all border border-white/5 active:scale-95 whitespace-nowrap">
+            <Save :size="16" />
+            SAVE MATCH
+          </button>
+
+          <button v-if="store.currentMatchId && !store.isCompleted" @click="handleCompleteMatch"
+            :disabled="store.isLoading"
+            class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap border border-emerald-400/20">
+            <CheckCircle2 :size="16" />
+            COMPLETE MATCH
+          </button>
+        </div>
+
+        <div v-if="store.isCompleted && store.canRate" class="flex items-center gap-2">
+          <button @click="showRatingModal = true"
+            class="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg shadow-primary/20 active:scale-95 whitespace-nowrap">
+            <Star :size="16" />
+            RATE PLAYERS
+          </button>
+        </div>
+
+        <div v-if="store.isCompleted"
+          class="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ml-auto">
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+          Completed
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+      <!-- Sidebar: The Pot -->
+      <div v-if="isAdmin || store.isCompleted" class="xl:col-span-1 border-r border-white/5 pr-0 xl:pr-8 h-[700px]">
+        <PlayerSelectSidebar />
+      </div>
+
+      <!-- Teams Area -->
+      <div :class="(isAdmin || store.isCompleted) ? 'xl:col-span-3' : 'xl:col-span-4'" class="space-y-8">
+        <!-- Stats Bar -->
+        <div v-if="!store.isCompleted" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="glass-card p-4 flex items-center justify-between border-l-4 border-l-primary/50">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">In Pot</div>
+            <div class="text-2xl font-black text-white">{{ store.selectedPlayerIds.length }}</div>
+          </div>
+          <div class="glass-card p-4 flex items-center justify-between border-l-4 border-l-warning/50">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">Balance Diff</div>
+            <div class="text-2xl font-black text-white">{{ store.powerBalance }}</div>
+          </div>
+        </div>
+
+        <!-- Scrollable Teams Grid -->
+        <div v-if="Object.keys(store.teams).length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
+          <div v-for="n in store.teamsCount" :key="n">
+            <TeamColumn :title="`Team ${String.fromCharCode(64 + n)}`" :team-number="n" v-model:players="store.teams[n]"
+              :power-score="store.teamPower(n).toFixed(1)" />
+          </div>
+        </div>
+
+        <!-- No Match State -->
+        <div v-else
+          class="flex flex-col items-center justify-center py-20 bg-white/5 border border-dashed border-white/10 rounded-3xl">
+          <CalendarIcon :size="48" class="text-slate-700 mb-4" />
+          <h3 class="text-xl font-bold text-slate-400">No match scheduled</h3>
+          <p class="text-slate-500 text-sm mb-6">Select another date to view previous matches.</p>
+
+          <div v-if="store.nextMatchDate"
+            class="space-y-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div
+              class="px-4 py-2 bg-primary/10 border border-primary/20 rounded-full text-primary text-[10px] font-black uppercase tracking-widest inline-block">
+              Next Match Found
+            </div>
+            <p class="text-white font-medium">There is a match scheduled for <span class="text-primary font-black">{{
+              formatDate(store.nextMatchDate) }}</span></p>
+            <button @click="store.matchDate = store.nextMatchDate; onDateChange()"
+              class="btn-primary px-6 py-2 text-xs uppercase">
+              JUMP TO {{ formatDate(store.nextMatchDate) }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <PlayerRatingModal v-if="showRatingModal" v-model="showRatingModal" :match-id="store.currentMatchId!"
+      :teams="store.teams" :current-player-id="store.currentPlayerId || ''" />
+  </div>
+</template>
+
+<style scoped>
+.font-display {
+  font-family: 'Outfit', sans-serif;
+}
+</style>
