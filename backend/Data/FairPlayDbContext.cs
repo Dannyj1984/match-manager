@@ -12,6 +12,8 @@ public class FairPlayDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<MatchAssignment> MatchAssignments => Set<MatchAssignment>();
     public DbSet<RawRating> RawRatings => Set<RawRating>();
+    public DbSet<League> Leagues => Set<League>();
+    public DbSet<LeagueMembership> LeagueMemberships => Set<LeagueMembership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -20,6 +22,11 @@ public class FairPlayDbContext : IdentityDbContext<ApplicationUser>
         // Composite key for MatchAssignment
         modelBuilder.Entity<MatchAssignment>()
             .HasKey(ma => new { ma.MatchId, ma.PlayerId });
+
+        // Unique constraint for LeagueMembership (one user can only have one membership per league)
+        modelBuilder.Entity<LeagueMembership>()
+            .HasIndex(lm => new { lm.LeagueId, lm.UserId })
+            .IsUnique();
 
         // Relationship configuration
         modelBuilder.Entity<RawRating>()

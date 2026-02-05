@@ -8,22 +8,26 @@ const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin
 
 const route = useRoute()
 
-onMounted(async () => {
-  await store.fetchPlayers()
+const { currentLeague } = useLeague()
 
-  // Fetch current user's player ID
-  const me = await store.fetchMe()
-  if (me) {
-    store.currentPlayerId = me.id
+watch(currentLeague, async (newLeague) => {
+  if (newLeague) {
+    await store.fetchPlayers()
+
+    // Fetch current user's player ID
+    const me = await store.fetchMe()
+    if (me) {
+      store.currentPlayerId = me.id
+    }
+
+    if (route.query.date) {
+      store.matchDate = route.query.date as string
+    }
+
+    // Initial fetch for selected date
+    await store.fetchMatchByDate(store.matchDate)
   }
-
-  if (route.query.date) {
-    store.matchDate = route.query.date as string
-  }
-
-  // Initial fetch for selected date
-  await store.fetchMatchByDate(store.matchDate)
-})
+}, { immediate: true })
 
 const handleGenerateTeams = async () => {
   await store.generateTeams()
@@ -60,7 +64,7 @@ const handleCompleteMatch = async () => {
 }
 
 definePageMeta({
-  middleware: 'auth'
+  middleware: ['auth', 'league', 'member']
 })
 </script>
 

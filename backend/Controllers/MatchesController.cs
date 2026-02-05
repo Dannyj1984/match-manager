@@ -1,9 +1,9 @@
 using FairPlay.Api.Data;
 using FairPlay.Api.Models;
 using FairPlay.Api.Services;
+using FairPlay.Api.Middleware;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 
@@ -26,11 +26,13 @@ public class MatchesController : ControllerBase
     }
 
     [HttpPost("calculate-teams")]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(restrictSuperAdmin: true), LeagueAdmin]
     public async Task<IActionResult> CalculateTeams([FromBody] TeamCalculationRequest request)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var players = await _context.Players
-            .Where(p => request.PlayerIds.Contains(p.Id))
+            .Where(p => p.LeagueId == leagueId && request.PlayerIds.Contains(p.Id))
             .ToListAsync();
 
         if (players.Count != request.PlayerIds.Count)
@@ -41,7 +43,7 @@ public class MatchesController : ControllerBase
     }
 
     [HttpPatch("{id}/complete")]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(restrictSuperAdmin: true), LeagueAdmin]
     public async Task<IActionResult> CompleteMatch(Guid id)
     {
         try
@@ -56,12 +58,15 @@ public class MatchesController : ControllerBase
     }
 
     [HttpGet("by-date/{date}")]
+    [LeagueContext(restrictSuperAdmin: true)]
     public async Task<IActionResult> GetMatchByDate(DateTime date)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var match = await _context.Matches
             .Include(m => m.MatchAssignments)
             .ThenInclude(ma => ma.Player)
-            .Where(m => m.Date.Date >= date.Date)
+            .Where(m => m.LeagueId == leagueId && m.Date.Date >= date.Date)
             .OrderBy(m => m.Date)
             .FirstOrDefaultAsync();
 
@@ -70,13 +75,20 @@ public class MatchesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(restrictSuperAdmin: true), LeagueAdmin]
     public async Task<IActionResult> CreateMatch([FromBody] CreateMatchRequest request)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
+        // Get league for default location
+        var league = await _context.Leagues.FindAsync(leagueId);
+        
         var match = new Match
         {
             Id = Guid.NewGuid(),
+            LeagueId = leagueId,
             Date = request.Date,
+            Location = request.Location ?? league?.Location,
             FormatType = request.FormatType,
             IsCompleted = false
         };
@@ -98,23 +110,44 @@ public class MatchesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [LeagueContext(restrictSuperAdmin: true)]
     public async Task<IActionResult> GetMatch(Guid id)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var match = await _context.Matches
             .Include(m => m.MatchAssignments)
             .ThenInclude(ma => ma.Player)
             .Include(m => m.RawRatings)
-            .FirstOrDefaultAsync(m => m.Id == id);
+            .FirstOrDefaultAsync(m => m.Id == id && m.LeagueId == leagueId);
 
         if (match == null) return NotFound();
         return Ok(match);
     }
 
     [HttpGet("dashboard")]
+    [LeagueContext(required: false, restrictSuperAdmin: true)]
     public async Task<IActionResult> GetDashboard()
     {
         var userId = User.FindFirstValue("userId");
-        var player = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+        var leagueIdObj = HttpContext.Items["LeagueId"];
+        
+        // If no league context, return empty dashboard
+        if (leagueIdObj == null)
+        {
+            return Ok(new
+            {
+                lastMatchDate = (DateTime?)null,
+                nextMatch = (object?)null,
+                recentMatches = new List<object>(),
+                needsLeague = true
+            });
+        }
+        
+        var leagueId = (Guid)leagueIdObj;
+        
+        var player = await _context.Players
+            .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (player == null) return NotFound();
 
         // 1. Most recent completed match for the user
@@ -249,7 +282,7 @@ public class MatchesController : ControllerBase
 
 public record RatingSubmissionDto(Guid SubjectId, int Value);
 
-public record CreateMatchRequest(DateTime Date, string FormatType, List<AssignmentDto> Assignments);
+public record CreateMatchRequest(DateTime Date, string FormatType, string? Location, List<AssignmentDto> Assignments);
 public record AssignmentDto(Guid PlayerId, int TeamNumber);
 
 public record TeamCalculationRequest(List<Guid> PlayerIds, int TeamCount);

@@ -8,6 +8,9 @@ public class Player
     public Guid Id { get; set; }
     
     [Required]
+    public Guid LeagueId { get; set; }
+    
+    [Required]
     [MaxLength(200)]
     public string FullName { get; set; } = string.Empty;
     
@@ -23,6 +26,10 @@ public class Player
     public string? IdentityUserId { get; set; }
     [JsonIgnore]
     public ApplicationUser? User { get; set; }
+    
+    // Link to League
+    [JsonIgnore]
+    public League? League { get; set; }
     
     [JsonIgnore]
     public List<MatchAssignment> MatchAssignments { get; set; } = new();

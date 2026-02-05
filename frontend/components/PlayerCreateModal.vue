@@ -29,11 +29,22 @@ const resetForm = () => {
     error.value = ''
 }
 
+const { currentLeague } = useLeague()
+
 const handleSubmit = async () => {
     isLoading.value = true
     error.value = ''
 
-    const result = await store.createPlayer(form)
+    if (!currentLeague.value?.id) {
+        error.value = 'No active league selected'
+        isLoading.value = false
+        return
+    }
+
+    const result = await store.createPlayer({
+        ...form,
+        leagueId: currentLeague.value.id
+    })
 
     if (result.success) {
         resetForm()

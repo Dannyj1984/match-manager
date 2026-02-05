@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import '@/assets/css/main.css'
 const { status, data, signOut } = useAuth()
+const { currentLeague } = useLeague()
 </script>
 
 <template>
@@ -26,15 +27,24 @@ const { status, data, signOut } = useAuth()
       </div>
 
       <div class="hidden md:flex items-center gap-6">
-        <NuxtLink to="/" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Dashboard
+        <NuxtLink :to="(data as any)?.user?.isSuperAdmin ? '/leagues' : '/'"
+          class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+          {{ (data as any)?.user?.isSuperAdmin ? 'Leagues' : 'Dashboard' }}
         </NuxtLink>
-        <NuxtLink to="/match/setup" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+        <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
+          to="/match/setup" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
           {{ (data as any)?.user?.roles?.includes('Admin') ? 'Match Setup' : 'Matches' }}
         </NuxtLink>
-        <NuxtLink to="/profile" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Profile
+        <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
+          to="/profile" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Profile
         </NuxtLink>
-        <NuxtLink v-if="status === 'authenticated' && (data as any)?.user?.roles?.includes('Admin')" to="/players"
-          class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Players</NuxtLink>
+        <NuxtLink
+          v-if="status === 'authenticated' && (data as any)?.user?.roles?.includes('Admin') && currentLeague && currentLeague.role !== 'SuperAdmin'"
+          to="/players" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Players</NuxtLink>
+      </div>
+
+      <div v-if="status === 'authenticated' && !(data as any)?.user?.isSuperAdmin" class="flex items-center gap-6">
+        <LeagueSelector />
       </div>
 
       <div class="flex items-center gap-4">

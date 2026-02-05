@@ -47,7 +47,7 @@ const handleSave = async () => {
 }
 
 definePageMeta({
-    middleware: 'auth'
+    middleware: ['auth', 'league', 'member']
 })
 </script>
 

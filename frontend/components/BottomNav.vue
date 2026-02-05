@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Home, Calendar, User, Users } from 'lucide-vue-next'
 
-const { data } = useAuth()
+const { data, status } = useAuth()
+const { currentLeague } = useLeague()
 const route = useRoute()
 const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
+const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
 
 const isActive = (path: string) => {
     if (path === '/') {
@@ -19,40 +21,43 @@ const isActive = (path: string) => {
         <div class="bg-slate-900/95 backdrop-blur-xl border-t border-white/10">
             <div class="flex items-center justify-around px-2 py-3">
                 <!-- Dashboard -->
-                <NuxtLink to="/" :class="[
+                <NuxtLink :to="isSuperAdmin ? '/leagues' : '/'" :class="[
                     'flex flex-col items-center gap-1 px-4 py-2 transition-all',
-                    isActive('/')
+                    isActive(isSuperAdmin ? '/leagues' : '/')
                         ? 'text-primary bg-primary/10'
                         : 'text-slate-500 hover:text-slate-300'
                 ]">
-                    <Home :size="24" :stroke-width="isActive('/') ? 2.5 : 2" />
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Home</span>
+                    <Home :size="24" :stroke-width="isActive(isSuperAdmin ? '/leagues' : '/') ? 2.5 : 2" />
+                    <span class="text-[10px] font-bold uppercase tracking-wider">{{ isSuperAdmin ? 'Leagues' : 'Home'
+                        }}</span>
                 </NuxtLink>
 
                 <!-- Match -->
-                <NuxtLink to="/match/setup" :class="[
-                    'flex flex-col items-center gap-1 px-4 py-2  transition-all',
-                    isActive('/match')
-                        ? 'text-primary bg-primary/10'
-                        : 'text-slate-500 hover:text-slate-300'
-                ]">
+                <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
+                    to="/match/setup" :class="[
+                        'flex flex-col items-center gap-1 px-4 py-2  transition-all',
+                        isActive('/match')
+                            ? 'text-primary bg-primary/10'
+                            : 'text-slate-500 hover:text-slate-300'
+                    ]">
                     <Calendar :size="24" :stroke-width="isActive('/match') ? 2.5 : 2" />
                     <span class="text-[10px] font-bold uppercase tracking-wider">Match</span>
                 </NuxtLink>
 
                 <!-- Profile -->
-                <NuxtLink to="/profile" :class="[
-                    'flex flex-col items-center gap-1 px-4 py-2 transition-all',
-                    isActive('/profile')
-                        ? 'text-primary bg-primary/10'
-                        : 'text-slate-500 hover:text-slate-300'
-                ]">
+                <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
+                    to="/profile" :class="[
+                        'flex flex-col items-center gap-1 px-4 py-2 transition-all',
+                        isActive('/profile')
+                            ? 'text-primary bg-primary/10'
+                            : 'text-slate-500 hover:text-slate-300'
+                    ]">
                     <User :size="24" :stroke-width="isActive('/profile') ? 2.5 : 2" />
                     <span class="text-[10px] font-bold uppercase tracking-wider">Profile</span>
                 </NuxtLink>
 
                 <!-- Players (Admin Only) -->
-                <NuxtLink v-if="isAdmin" to="/players" :class="[
+                <NuxtLink v-if="isAdmin && currentLeague && currentLeague.role !== 'SuperAdmin'" to="/players" :class="[
                     'flex flex-col items-center gap-1 px-4 py-2 transition-all',
                     isActive('/players')
                         ? 'text-primary bg-primary/10'

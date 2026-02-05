@@ -62,11 +62,17 @@ export const useMatchStore = defineStore('match', {
             }
         },
 
-        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number }) {
+        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number, preferredPosition: string, leagueId?: string }) {
             const { fetch } = useApi()
             try {
+                const headers: Record<string, string> = {}
+                if (playerData.leagueId) {
+                    headers['X-League-Id'] = playerData.leagueId
+                }
+
                 const newPlayer = await fetch<Player>('/players', {
                     method: 'POST',
+                    headers,
                     body: playerData
                 })
                 this.availablePlayers.push(newPlayer)

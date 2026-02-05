@@ -2,10 +2,21 @@
 import { useMatchStore } from '@/stores/match'
 import { Users, Star, Calendar, ShieldCheck, Search, Edit2, X, Check } from 'lucide-vue-next'
 
-const store = useMatchStore()
+definePageMeta({
+    middleware: ['auth', 'league', 'member']
+})
 
+const store = useMatchStore()
+const { currentLeague } = useLeague()
 const { data } = useAuth()
-const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
+
+const isAdmin = computed(() => {
+    // Check for Super Admin
+    if ((data.value as any)?.user?.isSuperAdmin) return true
+
+    // Check for League Admin
+    return currentLeague.value?.role === 'Admin' || currentLeague.value?.role === 'SuperAdmin'
+})
 
 const isModalOpen = ref(false)
 const searchQuery = ref('')
@@ -21,9 +32,11 @@ const filteredPlayers = computed(() => {
     )
 })
 
-onMounted(async () => {
-    await store.fetchPlayers()
-})
+watch(currentLeague, async (newLeague) => {
+    if (newLeague) {
+        await store.fetchPlayers()
+    }
+}, { immediate: true })
 
 const handlePromote = async (player: any) => {
     if (!confirm(`Are you sure you want to promote ${player.fullName} to Admin?`)) return
