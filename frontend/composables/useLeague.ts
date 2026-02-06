@@ -4,7 +4,6 @@ export const useLeague = () => {
     const { token } = useAuth()
 
     const fetchUserLeagues = async () => {
-        console.log(token.value)
         try {
             const response = await $fetch('/api/leagues', {
                 headers: {
@@ -24,6 +23,11 @@ export const useLeague = () => {
 
     const setCurrentLeague = (league: any) => {
         currentLeague.value = league
+    }
+
+    const clearLeague = () => {
+        currentLeague.value = null
+        userLeagues.value = []
     }
 
     const createLeague = async (leagueData: {
@@ -195,6 +199,7 @@ export const useLeague = () => {
         userLeagues,
         fetchUserLeagues,
         setCurrentLeague,
+        clearLeague,
         createLeague,
         updateLeague,
         getLeague,

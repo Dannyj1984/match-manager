@@ -3,6 +3,7 @@ using System;
 using FairPlay.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FairPlay.Api.Data.Migrations
 {
     [DbContext(typeof(FairPlayDbContext))]
-    partial class FairPlayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260206095522_AddCostToLeague")]
+    partial class AddCostToLeague
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

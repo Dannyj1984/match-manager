@@ -53,7 +53,7 @@
       </div>
 
       <!-- Create League Admin -->
-      <div class="glass-card p-6 mb-6">
+      <div v-if="(data as any)?.user?.roles" class="glass-card p-6 mb-6">
         <h2 class="text-xl font-bold mb-4">Create League Admin</h2>
         <p class="text-slate-400 text-sm mb-4">Create a new user account and assign them as an admin for this league.
         </p>
@@ -80,10 +80,9 @@
               <select v-model="adminForm.preferredPosition"
                 class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none">
                 <option value="">Any</option>
-                <option value="Goalkeeper">Goalkeeper</option>
-                <option value="Defender">Defender</option>
-                <option value="Midfielder">Midfielder</option>
-                <option value="Forward">Forward</option>
+                <option v-for="position in availablePositions" :key="position" :value="position">
+                  {{ position }}
+                </option>
               </select>
             </div>
           </div>
@@ -145,6 +144,9 @@ definePageMeta({
 const route = useRoute()
 
 const { updateLeague, getLeague, getLeagueMembers, addMember, removeMember, promoteToAdmin, demoteAdmin, createLeagueAdmin } = useLeague()
+const { data } = useAuth()
+const { getPositionsForSport } = useSportPositions()
+const modal = useModal()
 
 const leagueId = route.params.id as string
 const league = ref<any>(null)
@@ -164,6 +166,11 @@ const adminForm = ref({
   email: '',
   password: '',
   preferredPosition: ''
+})
+
+// Get positions based on current league sport
+const availablePositions = computed(() => {
+  return getPositionsForSport(leagueForm.value.sport)
 })
 
 onMounted(async () => {
@@ -197,17 +204,20 @@ const loadLeagueData = async () => {
 const handleUpdateLeague = async () => {
   try {
     await updateLeague(leagueId, leagueForm.value)
-    alert('League updated successfully!')
+    modal.showInfo(
+      `League ${league.value.name} has been updated successfully!`,
+      'Update League'
+    )
   } catch (error) {
     console.error('Failed to update league:', error)
-    alert('Failed to update league')
+    modal.showError('Failed to update league', 'Error')
   }
 }
 
 const handleCreateAdmin = async () => {
   try {
     await createLeagueAdmin(leagueId, adminForm.value)
-    alert('League admin created successfully!')
+    modal.showInfo('League admin created successfully!', 'Success')
     // Reset form
     adminForm.value = {
       fullName: '',
@@ -219,7 +229,7 @@ const handleCreateAdmin = async () => {
     await loadLeagueData()
   } catch (error: any) {
     console.error('Failed to create league admin:', error)
-    alert(error.data?.Message || 'Failed to create league admin')
+    modal.showError(error.data?.Message || 'Failed to create league admin', 'Error')
   }
 }
 

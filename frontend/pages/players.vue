@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Users, Star, Calendar, ShieldCheck, Search, Edit2, X, Check } from 'lucide-vue-next'
+import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check } from 'lucide-vue-next'
 
 definePageMeta({
     middleware: ['auth', 'league', 'member']
@@ -18,6 +18,7 @@ const isAdmin = computed(() => {
     return currentLeague.value?.role === 'Admin' || currentLeague.value?.role === 'SuperAdmin'
 })
 
+const modal = useModal()
 const isModalOpen = ref(false)
 const searchQuery = ref('')
 const editingPlayerId = ref<string | null>(null)
@@ -39,13 +40,34 @@ watch(currentLeague, async (newLeague) => {
 }, { immediate: true })
 
 const handlePromote = async (player: any) => {
-    if (!confirm(`Are you sure you want to promote ${player.fullName} to Admin?`)) return
+    const confirmed = await modal.showConfirm(
+        `Are you sure you want to promote ${player.fullName} to Admin?`,
+        'Promote to Admin'
+    )
+    if (!confirmed) return
 
     const result = await store.promoteToAdmin(player.id)
     if (result.success) {
-        alert(`${player.fullName} is now an Admin.`)
+        modal.showSuccess(`${player.fullName} is now an Admin.`)
+        // Refresh to get updated role
+        await store.fetchPlayers()
     } else {
-        alert(result.error)
+        modal.showError(result.error || 'Failed to promote player')
+    }
+}
+
+const handleDemote = async (player: any) => {
+    const confirmed = await modal.showConfirm(
+        `Are you sure you want to demote ${player.fullName} to Member?`,
+        'Demote to Member'
+    )
+    if (!confirmed) return
+
+    const result = await store.demoteToMember(player.id)
+    if (result.success) {
+        modal.showSuccess(`${player.fullName} is now a Member.`)
+    } else {
+        modal.showError(result.error || 'Failed to demote player')
     }
 }
 
@@ -61,7 +83,7 @@ const cancelEditRating = () => {
 
 const saveRating = async (player: any) => {
     if (editingRating.value < 1 || editingRating.value > 10) {
-        alert('Rating must be between 1 and 10')
+        modal.showError('Rating must be between 1 and 10')
         return
     }
 
@@ -152,11 +174,22 @@ const formatDate = (dateString?: string) => {
                     </div>
                 </div>
 
-                <div v-if="isAdmin" class="pt-2 border-t border-white/5 mt-auto">
+                <div v-if="isAdmin && player.role !== 'Admin' && player.role !== 'SuperAdmin'"
+                    class="pt-2 border-t border-white/5 mt-auto">
                     <button @click="handlePromote(player)"
                         class="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 group">
                         <ShieldCheck :size="14" class="group-hover:text-primary transition-colors" />
                         PROMOTE TO ADMIN
+                    </button>
+                </div>
+
+                <!-- Demote button - only for admins who are not the current user -->
+                <div v-if="isAdmin && (player.role === 'Admin' || player.role === 'SuperAdmin') && player.id !== (data as any)?.user?.playerId"
+                    class="pt-2 border-t border-white/5 mt-auto">
+                    <button @click="handleDemote(player)"
+                        class="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 text-xs font-bold transition-all flex items-center justify-center gap-2 group">
+                        <ShieldMinus :size="14" class="group-hover:text-red-500 transition-colors" />
+                        DEMOTE TO MEMBER
                     </button>
                 </div>
             </div>

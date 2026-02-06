@@ -64,6 +64,7 @@ public class LeaguesController : ControllerBase
                 lm.League.MaxTeams,
                 lm.League.Location,
                 lm.League.Description,
+                lm.League.Cost,
                 lm.Role
             })
             .ToListAsync();
@@ -86,6 +87,7 @@ public class LeaguesController : ControllerBase
                 l.MaxTeams,
                 l.Location,
                 l.Description,
+                l.Cost,
                 l.CreatedDate
             })
             .FirstOrDefaultAsync();
@@ -109,6 +111,7 @@ public class LeaguesController : ControllerBase
             MaxTeams = request.MaxTeams,
             Location = request.Location,
             Description = request.Description,
+            Cost = request.Cost,
             CreatedByUserId = userId!,
             CreatedDate = DateTime.UtcNow,
             IsActive = true
@@ -156,6 +159,7 @@ public class LeaguesController : ControllerBase
         league.MaxTeams = request.MaxTeams;
         league.Location = request.Location;
         league.Description = request.Description;
+        league.Cost = request.Cost;
 
         await _context.SaveChangesAsync();
 
@@ -221,9 +225,37 @@ public class LeaguesController : ControllerBase
         };
 
         _context.LeagueMemberships.Add(membership);
+        
+        // Check if player record already exists
+        var existingPlayer = await _context.Players
+            .FirstOrDefaultAsync(p => p.IdentityUserId == user.Id && p.LeagueId == id);
+        
+        Guid playerId;
+        
+        if (existingPlayer == null)
+        {
+            // Create a Player record so they can participate in matches
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                FullName = user.Email ?? "Player",
+                IdentityUserId = user.Id,
+                LeagueId = id,
+                CurrentRating = 5,
+                PreferredPosition = "Any"
+            };
+            
+            _context.Players.Add(player);
+            playerId = player.Id;
+        }
+        else
+        {
+            playerId = existingPlayer.Id;
+        }
+        
         await _context.SaveChangesAsync();
 
-        return Ok(new { Message = "Member added successfully" });
+        return Ok(new { Message = "Member added successfully", PlayerId = playerId });
     }
 
     // DELETE /api/leagues/{id}/members/{userId} - Remove member (League admins only)
@@ -334,7 +366,7 @@ public class LeaguesController : ControllerBase
             FullName = request.FullName,
             IdentityUserId = newUser.Id,
             LeagueId = id,
-            CurrentRating = 1500,
+            CurrentRating = 5,
             PreferredPosition = request.PreferredPosition ?? "Any"
         };
         
@@ -365,7 +397,9 @@ public class LeaguesController : ControllerBase
     }
 }
 
-public record CreateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, string? InitialAdminUserId);
-public record UpdateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description);
+// DTOs
+public record LeagueDto(Guid Id, string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, string Role);
+public record CreateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, string? InitialAdminUserId);
+public record UpdateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost);
 public record AddMemberRequest(string Email);
 public record CreateLeagueAdminRequest(string Email, string FullName, string Password, string? PreferredPosition);

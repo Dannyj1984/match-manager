@@ -24,6 +24,8 @@ public class League
     [MaxLength(500)]
     public string? Description { get; set; }
     
+    public decimal Cost { get; set; } = 0.00m;
+    
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     
     [Required]

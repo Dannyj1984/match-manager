@@ -1,14 +1,23 @@
 <template>
-  <div v-if="userLeagues.length > 0" class="league-selector">
-    <select v-model="selectedLeagueId" @change="onLeagueChange" class="league-select text-black">
-      <option class="text-black" v-for="league in userLeagues" :key="league.id" :value="league.id">
-        {{ league.name }} ({{ league.sport }})
-      </option>
-    </select>
-
-    <button v-if="isSuperAdmin" @click="$router.push('/leagues')" class="create-league-btn">
-      + Create League
-    </button>
+  <div v-if="userLeagues.length > 0" class="flex items-center gap-3 w-full">
+    <div v-if="userLeagues.length > 1" class="relative w-full">
+      <select v-model="selectedLeagueId" @change="onLeagueChange"
+        class="w-full appearance-none px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm font-medium focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all cursor-pointer">
+        <option v-for="league in userLeagues" :key="league.id" :value="league.id" class="bg-slate-800 text-white">
+          {{ league.name }} ({{ league.sport }})
+        </option>
+      </select>
+      <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+    </div>
+    <div v-else>
+      <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">{{ userLeagues[0].name }} ({{
+        userLeagues[0].sport }})</p>
+    </div>
   </div>
 </template>
 
@@ -18,9 +27,6 @@ const { data } = useAuth()
 const router = useRouter()
 
 const selectedLeagueId = ref(currentLeague.value?.id || '')
-
-// Check if user is super admin from token claims
-const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === 'True')
 
 // Fetch leagues on mount
 onMounted(async () => {
@@ -46,47 +52,3 @@ watch(currentLeague, (newLeague) => {
   }
 })
 </script>
-
-<style scoped>
-.league-selector {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.league-select {
-  padding: 8px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-  min-width: 200px;
-}
-
-.league-select:hover {
-  border-color: #3b82f6;
-}
-
-.league-select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.create-league-btn {
-  padding: 8px 16px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.create-league-btn:hover {
-  background: #2563eb;
-}
-</style>

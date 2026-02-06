@@ -31,6 +31,10 @@ public class MatchesController : ControllerBase
     {
         var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
         
+        // Get league to determine sport
+        var league = await _context.Leagues.FindAsync(leagueId);
+        if (league == null) return NotFound("League not found");
+        
         var players = await _context.Players
             .Where(p => p.LeagueId == leagueId && request.PlayerIds.Contains(p.Id))
             .ToListAsync();
@@ -38,7 +42,7 @@ public class MatchesController : ControllerBase
         if (players.Count != request.PlayerIds.Count)
             return BadRequest("Some player IDs were not found.");
 
-        var assignments = _balancer.BalanceTeams(Guid.Empty, players, request.TeamCount);
+        var assignments = _balancer.BalanceTeams(Guid.Empty, players, request.TeamCount, league.Sport);
         return Ok(assignments.Select(a => new { a.PlayerId, a.TeamNumber }));
     }
 
@@ -278,6 +282,72 @@ public class MatchesController : ControllerBase
         var wasParticipant = match.MatchAssignments.Any(ma => ma.PlayerId == player.Id);
         return Ok(new { canRate = wasParticipant && match.IsCompleted });
     }
+
+    [HttpPost("toggle-participation")]
+    [LeagueContext(restrictSuperAdmin: true)]
+    public async Task<IActionResult> ToggleParticipation([FromBody] ToggleParticipationRequest request)
+    {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        var userId = User.FindFirstValue("userId");
+        
+        // Get current player
+        var player = await _context.Players
+            .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
+        if (player == null) return NotFound("Player not found");
+
+        // Get or create match for the date
+        var match = await _context.Matches
+            .Include(m => m.MatchAssignments)
+            .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == request.Date.Date);
+
+        if (match == null)
+        {
+            // Create new match if doesn't exist
+            match = new Match
+            {
+                Id = Guid.NewGuid(),
+                LeagueId = leagueId,
+                Date = request.Date,
+                FormatType = "5v5",
+                IsCompleted = false
+            };
+            _context.Matches.Add(match);
+        }
+
+        // Toggle participation
+        var existingAssignment = match.MatchAssignments
+            .FirstOrDefault(ma => ma.PlayerId == player.Id);
+
+        if (request.IsParticipating)
+        {
+            // Add player if not already in
+            if (existingAssignment == null)
+            {
+                match.MatchAssignments.Add(new MatchAssignment
+                {
+                    MatchId = match.Id,
+                    PlayerId = player.Id,
+                    TeamNumber = 0 // Not assigned to team yet
+                });
+            }
+        }
+        else
+        {
+            // Remove player
+            if (existingAssignment != null)
+            {
+                match.MatchAssignments.Remove(existingAssignment);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { 
+            success = true, 
+            isParticipating = request.IsParticipating,
+            message = request.IsParticipating ? "You're in!" : "You're out" 
+        });
+    }
 }
 
 public record RatingSubmissionDto(Guid SubjectId, int Value);
@@ -286,3 +356,5 @@ public record CreateMatchRequest(DateTime Date, string FormatType, string? Locat
 public record AssignmentDto(Guid PlayerId, int TeamNumber);
 
 public record TeamCalculationRequest(List<Guid> PlayerIds, int TeamCount);
+
+public record ToggleParticipationRequest(DateTime Date, bool IsParticipating);

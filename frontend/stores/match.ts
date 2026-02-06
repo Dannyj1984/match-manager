@@ -6,6 +6,8 @@ export interface Player {
     currentRating: number
     preferredPosition: string
     lastPlayed?: string
+    role?: string // LeagueMembership role: 'Admin', 'Member', 'SuperAdmin'
+    identityUserId?: string // User ID to check for self-demotion
 }
 
 export interface MatchAssignment {
@@ -94,6 +96,39 @@ export const useMatchStore = defineStore('match', {
             } catch (error: any) {
                 console.error('Failed to promote player', error)
                 return { success: false, error: error.data?.message || 'Failed to promote player' }
+            }
+        },
+
+        async demoteToMember(playerId: string) {
+            const { fetch } = useApi()
+            try {
+                await fetch(`/players/${playerId}/demote`, {
+                    method: 'POST'
+                })
+                // Refresh player list to get updated roles
+                await this.fetchPlayers()
+                return { success: true }
+            } catch (error: any) {
+                console.error('Failed to demote player', error)
+                return { success: false, error: error.data?.message || 'Failed to demote player' }
+            }
+        },
+
+        async toggleSelfParticipation(date: string, isParticipating: boolean) {
+            const { fetch } = useApi()
+            try {
+                const result = await fetch<{ success: boolean, isParticipating: boolean, message: string }>('/matches/toggle-participation', {
+                    method: 'POST',
+                    body: { date, isParticipating }
+                })
+
+                // Refresh match data to get updated player list
+                await this.fetchMatchByDate(date)
+
+                return { success: true, message: result.message }
+            } catch (error: any) {
+                console.error('Failed to toggle participation', error)
+                return { success: false, error: error.data?.message || 'Failed to update participation' }
             }
         },
 
@@ -197,13 +232,11 @@ export const useMatchStore = defineStore('match', {
 
             try {
                 const match = await fetch<any>(`/matches/by-date/${date}`)
-                console.log('[MatchStore] Fetched match:', match)
                 if (!match) return { success: false }
 
                 const returnedDate = (match.date || match.Date)?.split('T')[0]
 
                 if (returnedDate === date) {
-                    console.log('[MatchStore] Exact date match found:', returnedDate)
                     this.currentMatchId = match.id || match.Id
                     this.isCompleted = match.isCompleted || match.IsCompleted
 
@@ -243,14 +276,12 @@ export const useMatchStore = defineStore('match', {
                     this.teams = newTeams
                     this.teamsCount = maxTeam
                     this.formatType = match.formatType || match.FormatType || '5v5'
-                    console.log('[MatchStore] State updated. Teams:', Object.keys(this.teams).length, 'Players:', this.selectedPlayerIds.length)
 
                     // Check if user can rate this match
                     if (this.isCompleted && this.currentMatchId) {
                         await this.checkCanRate(this.currentMatchId)
                     }
                 } else {
-                    console.log('[MatchStore] Future match found:', returnedDate)
                     this.nextMatchDate = returnedDate
                 }
 

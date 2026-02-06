@@ -53,6 +53,13 @@
               placeholder="Casual weekly games..."></textarea>
           </div>
 
+          <div>
+            <label class="block text-sm font-medium mb-2">Cost per Match</label>
+            <input v-model.number="newLeague.cost" type="number" step="0.01" min="0" required
+              class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none"
+              placeholder="5.00" />
+          </div>
+
           <div class="flex gap-3">
             <button type="submit" class="btn-primary">Create League</button>
             <button type="button" @click="showCreateForm = false" class="btn-secondary">Cancel</button>
@@ -79,6 +86,7 @@
               <div class="flex gap-4 text-sm text-slate-500">
                 <span>Max Teams: {{ league.maxTeams }}</span>
                 <span v-if="league.location">📍 {{ league.location }}</span>
+                <span v-if="league.cost">💰 £{{ league.cost.toFixed(2) }}</span>
               </div>
             </div>
             <div class="flex gap-2">
@@ -118,7 +126,8 @@ const newLeague = ref({
   sport: 'Football',
   maxTeams: 2,
   location: '',
-  description: ''
+  description: '',
+  cost: 0
 })
 
 // Check if user is super admin  
@@ -137,7 +146,8 @@ const handleCreateLeague = async () => {
       sport: 'Football',
       maxTeams: 2,
       location: '',
-      description: ''
+      description: '',
+      cost: 0
     }
   } catch (error) {
     console.error('Failed to create league:', error)

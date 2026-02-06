@@ -4,11 +4,12 @@ import { Users, Wand2, Play, Plus, Save, Calendar as CalendarIcon, Search, Check
 
 const store = useMatchStore()
 const { data } = useAuth()
-const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
+const modal = useModal()
 
 const route = useRoute()
 
 const { currentLeague } = useLeague()
+const isAdmin = computed(() => currentLeague.value?.role === 'Admin')
 
 watch(currentLeague, async (newLeague) => {
   if (newLeague) {
@@ -36,9 +37,9 @@ const handleGenerateTeams = async () => {
 const handleSaveMatch = async () => {
   const result = await store.saveMatch()
   if (result.success) {
-    alert('Match saved successfully!')
+    modal.showInfo('Match saved successfully!', 'Success')
   } else {
-    alert(result.error)
+    modal.showError(result.error, 'Error')
   }
 }
 
@@ -47,6 +48,12 @@ const onDateChange = async () => {
 }
 
 const showRatingModal = ref(false)
+const showPlayerList = ref(false)
+
+const formatDate = (dateStr: string) => {
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' }
+  return new Date(dateStr).toLocaleDateString(undefined, options)
+}
 
 const handleCompleteMatch = async () => {
   const matchId = store.currentMatchId
@@ -56,10 +63,25 @@ const handleCompleteMatch = async () => {
 
   const result = await store.completeMatch(matchId)
   if (result.success) {
-    alert('Match completed successfully!')
+    modal.showInfo('Match completed successfully!', 'Success')
     await store.fetchMatchByDate(store.matchDate)
   } else {
-    alert(result.error)
+    modal.showError(result.error, 'Error')
+  }
+}
+
+const isParticipating = computed(() => {
+  return store.selectedPlayerIds.includes(store.currentPlayerId || '')
+})
+
+const handleToggleParticipation = async () => {
+  const newState = !isParticipating.value
+  const result = await store.toggleSelfParticipation(store.matchDate, newState)
+
+  if (result.success) {
+    modal.showSuccess(result.message || (newState ? "You're in!" : "You're out"))
+  } else {
+    modal.showError(result.error || 'Failed to update participation')
   }
 }
 
@@ -91,6 +113,21 @@ definePageMeta({
             <input v-model="store.matchDate" type="date" @change="onDateChange"
               class="bg-slate-900/50 border border-white/5 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all cursor-pointer">
           </div>
+        </div>
+
+        <!-- Member Self-Selection Toggle -->
+        <div v-if="!isAdmin && !store.isCompleted" class="space-y-1.5">
+          <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">My Status</label>
+          <button @click="handleToggleParticipation" :class="[
+            'flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg active:scale-95 whitespace-nowrap',
+            isParticipating
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20 border border-emerald-400/20'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/5'
+          ]">
+            <CheckCircle2 v-if="isParticipating" :size="16" />
+            <Users v-else :size="16" />
+            {{ isParticipating ? "I'M PLAYING ✓" : "I'M NOT PLAYING" }}
+          </button>
         </div>
 
         <div v-if="isAdmin" class="space-y-1.5 flex flex-col">
@@ -154,10 +191,53 @@ definePageMeta({
       <div :class="(isAdmin || store.isCompleted) ? 'xl:col-span-3' : 'xl:col-span-4'" class="space-y-8">
         <!-- Stats Bar -->
         <div v-if="!store.isCompleted" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="glass-card p-4 flex items-center justify-between border-l-4 border-l-primary/50">
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">In Pot</div>
-            <div class="text-2xl font-black text-white">{{ store.selectedPlayerIds.length }}</div>
+          <!-- In Pot Card - Now Collapsible -->
+          <div class="glass-card p-4 border-l-4 border-l-primary/50 col-span-2 lg:col-span-2">
+            <button @click="showPlayerList = !showPlayerList"
+              class="w-full flex items-center justify-between text-left group hover:opacity-80 transition-opacity">
+              <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">Players In Match</div>
+              <div class="flex items-center gap-2">
+                <div class="text-2xl font-black text-white">{{ store.selectedPlayerIds.length }}</div>
+                <svg :class="['w-4 h-4 text-slate-500 transition-transform', showPlayerList ? 'rotate-180' : '']"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+
+            <!-- Collapsible Player List -->
+            <Transition name="expand">
+              <div v-if="showPlayerList" class="mt-4 pt-4 border-t border-white/5 space-y-2 max-h-60 overflow-y-auto">
+                <div v-for="playerId in store.selectedPlayerIds" :key="playerId" :class="[
+                  'flex items-center justify-between text-xs py-1.5 px-2 rounded-lg transition-colors',
+                  playerId === store.currentPlayerId
+                    ? 'bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30'
+                    : 'bg-white/5 hover:bg-white/10'
+                ]">
+                  <div class="flex items-center gap-2">
+                    <Users :size="12"
+                      :class="playerId === store.currentPlayerId ? 'text-emerald-400' : 'text-primary'" />
+                    <span
+                      :class="playerId === store.currentPlayerId ? 'text-emerald-300 font-bold' : 'text-slate-300 font-medium'">{{
+                        store.availablePlayers.find(p => p.id === playerId)?.fullName || 'Unknown'
+                      }}</span>
+                    <span v-if="playerId === store.currentPlayerId"
+                      class="text-[10px] text-emerald-400 font-black uppercase">(You)</span>
+                  </div>
+                  <div class="flex items-center gap-1 text-yellow-500">
+                    <Star :size="12" :fill="'currentColor'" />
+                    <span class="font-bold">{{
+                      store.availablePlayers.find(p => p.id === playerId)?.currentRating || '?'
+                    }}</span>
+                  </div>
+                </div>
+                <div v-if="store.selectedPlayerIds.length === 0" class="text-xs text-slate-500 italic py-2">
+                  No players signed up yet
+                </div>
+              </div>
+            </Transition>
           </div>
+
           <div class="glass-card p-4 flex items-center justify-between border-l-4 border-l-warning/50">
             <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">Balance Diff</div>
             <div class="text-2xl font-black text-white">{{ store.powerBalance }}</div>
@@ -205,5 +285,18 @@ definePageMeta({
 <style scoped>
 .font-display {
   font-family: 'Outfit', sans-serif;
+}
+
+.expand-enter-active,
+.expand-leave-active {
+  transition: all 0.3s ease;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 </style>

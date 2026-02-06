@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Home, Calendar, User, Users } from 'lucide-vue-next'
+import { Home, Calendar, User, Users, ListCheck } from 'lucide-vue-next'
 
 const { data, status } = useAuth()
 const { currentLeague } = useLeague()
 const route = useRoute()
-const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
+const isAdmin = computed(() => currentLeague.value?.role === 'Admin')
 const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
 
 const isActive = (path: string) => {
@@ -57,7 +57,7 @@ const isActive = (path: string) => {
                 </NuxtLink>
 
                 <!-- Players (Admin Only) -->
-                <NuxtLink v-if="isAdmin && currentLeague && currentLeague.role !== 'SuperAdmin'" to="/players" :class="[
+                <NuxtLink v-if="isAdmin && currentLeague && currentLeague.role === 'Admin'" to="/players" :class="[
                     'flex flex-col items-center gap-1 px-4 py-2 transition-all',
                     isActive('/players')
                         ? 'text-primary bg-primary/10'
@@ -65,6 +65,16 @@ const isActive = (path: string) => {
                 ]">
                     <Users :size="24" :stroke-width="isActive('/players') ? 2.5 : 2" />
                     <span class="text-[10px] font-bold uppercase tracking-wider">Players</span>
+                </NuxtLink>
+                <!-- Leagues (Admin Only) -->
+                <NuxtLink v-if="isAdmin && currentLeague && currentLeague.role === 'Admin'" to="/leagues" :class="[
+                    'flex flex-col items-center gap-1 px-4 py-2 transition-all',
+                    isActive('/leagues')
+                        ? 'text-primary bg-primary/10'
+                        : 'text-slate-500 hover:text-slate-300'
+                ]">
+                    <ListCheck :size="24" :stroke-width="isActive('/players') ? 2.5 : 2" />
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Leagues</span>
                 </NuxtLink>
             </div>
         </div>

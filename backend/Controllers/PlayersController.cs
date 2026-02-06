@@ -41,7 +41,12 @@ public class PlayersController : ControllerBase
                 p.FullName,
                 p.CurrentRating,
                 p.PreferredPosition,
-                p.LastPlayed
+                p.LastPlayed,
+                p.IdentityUserId,
+                Role = _context.LeagueMemberships
+                    .Where(lm => lm.LeagueId == leagueId && lm.UserId == p.IdentityUserId)
+                    .Select(lm => lm.Role)
+                    .FirstOrDefault()
             })
             .ToListAsync();
             
@@ -171,6 +176,32 @@ public class PlayersController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new { Message = $"{player.FullName} promoted to League Admin successfully" });
+    }
+
+    [HttpPost("{id}/demote")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
+    [LeagueAdmin]
+    public async Task<IActionResult> Demote(Guid id)
+    {
+        var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == id);
+        if (player == null) return NotFound(new { Message = "Player not found" });
+
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        if (player.LeagueId != leagueId) return BadRequest(new { Message = "Player is not in this league" });
+
+        if (string.IsNullOrEmpty(player.IdentityUserId))
+            return BadRequest(new { Message = "Player has no associated user account" });
+
+        // Update League Membership Role
+        var membership = await _context.LeagueMemberships
+            .FirstOrDefaultAsync(lm => lm.LeagueId == leagueId && lm.UserId == player.IdentityUserId);
+            
+        if (membership == null) return NotFound(new { Message = "League membership not found" });
+
+        membership.Role = "Member";
+        await _context.SaveChangesAsync();
+
+        return Ok(new { Message = $"{player.FullName} demoted to League Member successfully" });
     }
 
     [HttpPatch("{id}/rating")]

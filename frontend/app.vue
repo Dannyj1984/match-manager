@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import '@/assets/css/main.css'
 const { status, data, signOut } = useAuth()
-const { currentLeague } = useLeague()
+const { currentLeague, clearLeague } = useLeague()
+const modal = useModal()
+const router = useRouter()
+const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
+
+const handleLogout = async () => {
+  // Clear league state
+  clearLeague()
+
+  // Sign out and redirect to login
+  await signOut({ callbackUrl: '/login', redirect: true })
+}
 </script>
 
 <template>
@@ -27,23 +38,26 @@ const { currentLeague } = useLeague()
       </div>
 
       <div class="hidden md:flex items-center gap-6">
-        <NuxtLink :to="(data as any)?.user?.isSuperAdmin ? '/leagues' : '/'"
+        <NuxtLink :to="isSuperAdmin ? '/leagues' : '/'"
           class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
-          {{ (data as any)?.user?.isSuperAdmin ? 'Leagues' : 'Dashboard' }}
+          {{ isSuperAdmin ? 'Leagues' : 'Dashboard' }}
         </NuxtLink>
         <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
           to="/match/setup" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
-          {{ (data as any)?.user?.roles?.includes('Admin') ? 'Match Setup' : 'Matches' }}
+          {{ currentLeague?.role === 'Admin' ? 'Match Setup' : 'Matches' }}
         </NuxtLink>
         <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
           to="/profile" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Profile
         </NuxtLink>
-        <NuxtLink
-          v-if="status === 'authenticated' && (data as any)?.user?.roles?.includes('Admin') && currentLeague && currentLeague.role !== 'SuperAdmin'"
-          to="/players" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Players</NuxtLink>
+        <NuxtLink v-if="status === 'authenticated' && currentLeague?.role === 'Admin'" to="/players"
+          class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+          Players
+        </NuxtLink>
+        <NuxtLink v-if="status === 'authenticated' && currentLeague?.role === 'Admin'" to="/leagues"
+          class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Leagues</NuxtLink>
       </div>
 
-      <div v-if="status === 'authenticated' && !(data as any)?.user?.isSuperAdmin" class="flex items-center gap-6">
+      <div v-if="status === 'authenticated' && !isSuperAdmin" class="hidden md:flex items-center gap-6">
         <LeagueSelector />
       </div>
 
@@ -53,7 +67,7 @@ const { currentLeague } = useLeague()
             <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">User</div>
             <div class="text-xs font-medium text-slate-300">{{ (data as any)?.user?.email }}</div>
           </div>
-          <button @click="signOut({ callbackUrl: '/login' })"
+          <button @click="handleLogout"
             class="w-8 h-8 rounded-full bg-slate-800 border border-white/10 hover:border-danger/50 transition-colors flex items-center justify-center group">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 group-hover:text-danger">
@@ -67,12 +81,24 @@ const { currentLeague } = useLeague()
       </div>
     </nav>
 
+    <!-- Mobile League Selector -->
+    <div v-if="status === 'authenticated' && !isSuperAdmin"
+      class="md:hidden sticky top-[65px] z-40 bg-slate-900/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 shadow-lg shadow-black/20">
+      <LeagueSelector class="w-full" />
+    </div>
+
     <main class="pb-20 md:pb-0">
       <NuxtPage />
     </main>
 
     <!-- Mobile Bottom Navigation -->
     <BottomNav />
+
+    <!-- Global Modal -->
+    <Modal :is-open="modal.isOpen.value" :title="modal.modalConfig.value.title"
+      :message="modal.modalConfig.value.message" :type="modal.modalConfig.value.type"
+      :confirm-text="modal.modalConfig.value.confirmText" :cancel-text="modal.modalConfig.value.cancelText"
+      @confirm="modal.handleConfirm" @cancel="modal.handleCancel" @close="modal.close" />
 
     <!-- Background Decoration -->
     <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
