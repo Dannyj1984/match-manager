@@ -16,6 +16,8 @@ public class Player
     
     public decimal CurrentRating { get; set; } = 5.0m; // Default starting rating
     
+    public decimal? AvgMatchRating { get; set; } // Average of match ratings from last 6 months
+    
     [Required]
     [MaxLength(10)]
     public string PreferredPosition { get; set; } = "M"; // GK, D, M, A

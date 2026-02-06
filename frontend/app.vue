@@ -7,10 +7,8 @@ const router = useRouter()
 const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
 
 const handleLogout = async () => {
-  // Clear league state
   clearLeague()
 
-  // Sign out and redirect to login
   await signOut({ callbackUrl: '/login', redirect: true })
 }
 </script>

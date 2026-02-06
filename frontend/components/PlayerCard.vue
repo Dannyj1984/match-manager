@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Trophy, Calendar } from 'lucide-vue-next'
+import { Trophy, Calendar, Activity } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match'
 
 const store = useMatchStore()
@@ -8,6 +8,7 @@ interface Player {
   id: string
   fullName: string
   currentRating: number
+  avgMatchRating?: number
   preferredPosition: string
   lastPlayed?: string
 }
@@ -41,7 +42,17 @@ defineProps<{
     </div>
 
     <div class="flex items-center gap-2">
-      <div class="px-2 py-1 rounded-lg bg-white/5 border border-white/5 flex items-center gap-1.5 shadow-inner">
+      <!-- Avg Match Rating -->
+      <div v-if="player.avgMatchRating"
+        class="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1.5"
+        title="Avg Match Rating (Last 6 Months)">
+        <Activity :size="12" class="text-emerald-400" />
+        <span class="text-xs font-bold text-emerald-400">{{ Number(player.avgMatchRating).toFixed(1) }}</span>
+      </div>
+
+      <!-- Ability Rating -->
+      <div class="px-2 py-1 rounded-lg bg-white/5 border border-white/5 flex items-center gap-1.5 shadow-inner"
+        title="Ability Rating">
         <Trophy :size="12" class="text-warning" />
         <span class="text-xs font-bold text-slate-200">{{ Number(player.currentRating).toFixed(1) }}</span>
       </div>

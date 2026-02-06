@@ -14,6 +14,7 @@ public class FairPlayDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<RawRating> RawRatings => Set<RawRating>();
     public DbSet<League> Leagues => Set<League>();
     public DbSet<LeagueMembership> LeagueMemberships => Set<LeagueMembership>();
+    public DbSet<PlayerRating> PlayerRatings => Set<PlayerRating>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

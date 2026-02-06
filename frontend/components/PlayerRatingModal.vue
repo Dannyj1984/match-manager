@@ -11,12 +11,14 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:modelValue', 'success'])
 
+const modal = useModal()
 const store = useMatchStore()
 const isSaving = ref(false)
 const isLoading = ref(true)
 const ratings = ref<Record<string, number>>({})
 const existingRatings = ref<Record<string, number>>({})
 const hasRated = ref(false)
+const touchedRatings = ref<Record<string, boolean>>({})
 
 onMounted(async () => {
     isLoading.value = true
@@ -30,7 +32,7 @@ onMounted(async () => {
     } else {
         // Initialize with default 5
         Object.values(props.teams).flat().forEach(p => {
-            ratings.value[p.id] = p.currentRating
+            ratings.value[p.id] = 5
         })
     }
     isLoading.value = false
@@ -39,9 +41,24 @@ onMounted(async () => {
 const handleSave = async () => {
     if (hasRated.value) return
 
+    const count = Object.keys(ratings.value).filter(id => id !== props.currentPlayerId && touchedRatings.value[id]).length
+
+    if (count === 0) {
+        // Maybe allow submitting 0 ratings? Or confirm "Submit 0 ratings?"
+        // User logic implies we want to rate changed players.
+        // If 0, maybe just alerting "No players rated" or similar?
+        // But user said "Submit rating for x players".
+        const confirmed = await modal.showConfirm('No players have been rated. Close without submitting?', 'Close Rating?')
+        if (confirmed) emit('update:modelValue', false)
+        return
+    }
+
+    const confirmed = await modal.showConfirm(`Submit ratings for ${count} players?`, 'Confirm Submission')
+    if (!confirmed) return
+
     isSaving.value = true
     const submissions = Object.entries(ratings.value)
-        .filter(([id]) => id !== props.currentPlayerId) // Don't submit rating for self
+        .filter(([id]) => id !== props.currentPlayerId && touchedRatings.value[id]) // Only submit actively changed ratings
         .map(([id, val]) => ({
             subjectId: id,
             value: Math.round(val) // Ensure integer value
@@ -74,9 +91,11 @@ const handleSave = async () => {
                         <Star :size="20" fill="currentColor" />
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-white leading-tight">Rate Ability</h2>
-                        <p class="text-xs text-slate-500 font-medium">You are rating a player on overall ability, not on
-                            just todays performance</p>
+                        <div>
+                            <h2 class="text-xl font-bold text-white leading-tight">Rate Match Performance</h2>
+                            <p class="text-xs text-slate-500 font-medium">Rate players based on their performance in
+                                THIS match (1-10)</p>
+                        </div>
                     </div>
                 </div>
                 <button @click="emit('update:modelValue', false)"
@@ -107,7 +126,8 @@ const handleSave = async () => {
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                            <div v-for="player in players" :key="player.id" class="flex flex-col gap-3">
+                            <div v-for="player in players" :key="player.id" class="flex flex-col gap-3"
+                                :class="{ 'opacity-40 hover:opacity-100 transition-opacity': !touchedRatings[player.id] }">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
                                         <div
@@ -125,6 +145,7 @@ const handleSave = async () => {
 
                                 <input type="range" v-model.number="ratings[player.id]" min="1" max="10" step="1"
                                     :disabled="hasRated || player.id === currentPlayerId"
+                                    @input="touchedRatings[player.id] = true"
                                     class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50 disabled:cursor-not-allowed" />
                             </div>
                         </div>
@@ -135,7 +156,7 @@ const handleSave = async () => {
             <!-- Footer -->
             <div class="px-8 py-6 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <p class="text-xs text-slate-500 font-medium max-w-[200px]">Ratings are anonymous and contribute to
-                    overall player rankings.</p>
+                    the player's Average Match Rating.</p>
 
                 <button v-if="!hasRated" @click="handleSave" :disabled="isSaving"
                     class="flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-xl shadow-primary/20 active:scale-95">

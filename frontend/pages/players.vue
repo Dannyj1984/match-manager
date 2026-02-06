@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check } from 'lucide-vue-next'
+import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check, Activity } from 'lucide-vue-next'
 
 definePageMeta({
     middleware: ['auth', 'league', 'member']
@@ -162,13 +162,28 @@ const formatDate = (dateString?: string) => {
                             <X :size="18" />
                         </button>
                     </div>
-                    <div v-else class="flex items-center gap-2">
-                        <div class="bg-primary/10 text-primary px-3 py-1 rounded-lg font-black flex items-center gap-1">
-                            <Star :size="14" class="fill-primary" />
-                            {{ player.currentRating }}
+                    <div v-else class="flex items-center gap-3">
+                        <!-- Avg Match Rating -->
+                        <div v-if="player.avgMatchRating" class="flex flex-col items-end">
+                            <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Avg Match</span>
+                            <div class="text-emerald-400 font-black flex items-center gap-1">
+                                <Activity :size="14" />
+                                {{ Number(player.avgMatchRating).toFixed(1) }}
+                            </div>
                         </div>
+
+                        <!-- Ability Rating -->
+                        <div class="flex flex-col items-end">
+                            <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Ability</span>
+                            <div
+                                class="bg-primary/10 text-primary px-3 py-1 rounded-lg font-black flex items-center gap-1">
+                                <Star :size="14" class="fill-primary" />
+                                {{ player.currentRating }}
+                            </div>
+                        </div>
+
                         <button v-if="isAdmin" @click="startEditRating(player)"
-                            class="text-slate-500 hover:text-primary transition-colors">
+                            class="text-slate-500 hover:text-primary transition-colors pb-1">
                             <Edit2 :size="16" />
                         </button>
                     </div>

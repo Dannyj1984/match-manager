@@ -1,6 +1,7 @@
 using FairPlay.Api.Data;
 using FairPlay.Api.Models;
 using FairPlay.Api.Services;
+using FairPlay.Api.DTOs;
 using FairPlay.Api.Middleware;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,13 +17,13 @@ public class MatchesController : ControllerBase
 {
     private readonly FairPlayDbContext _context;
     private readonly ITeamBalancerService _balancer;
-    private readonly IRatingUpdateService _updateService;
+    private readonly IMatchRatingService _ratingService;
 
-    public MatchesController(FairPlayDbContext context, ITeamBalancerService balancer, IRatingUpdateService updateService)
+    public MatchesController(FairPlayDbContext context, ITeamBalancerService balancer, IMatchRatingService ratingService)
     {
         _context = context;
         _balancer = balancer;
-        _updateService = updateService;
+        _ratingService = ratingService;
     }
 
     [HttpPost("calculate-teams")]
@@ -50,15 +51,16 @@ public class MatchesController : ControllerBase
     [LeagueContext(restrictSuperAdmin: true), LeagueAdmin]
     public async Task<IActionResult> CompleteMatch(Guid id)
     {
-        try
-        {
-            await _updateService.CompleteMatchAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
+        var match = await _context.Matches.FindAsync(id);
+        if (match == null) return NotFound();
+
+        match.IsCompleted = true;
+        await _context.SaveChangesAsync();
+
+        // Note: Player avg match ratings are now updated when users submit match performance ratings
+        // via the MatchRatingService, not automatically when match is completed
+
+        return Ok(new { Message = "Match marked as completed" });
     }
 
     [HttpGet("by-date/{date}")]
@@ -87,30 +89,66 @@ public class MatchesController : ControllerBase
         // Get league for default location
         var league = await _context.Leagues.FindAsync(leagueId);
         
-        var match = new Match
-        {
-            Id = Guid.NewGuid(),
-            LeagueId = leagueId,
-            Date = request.Date,
-            Location = request.Location ?? league?.Location,
-            FormatType = request.FormatType,
-            IsCompleted = false
-        };
+        // Standardize date
+        var matchDate = request.Date.ToUniversalTime().Date;
 
-        foreach (var assignment in request.Assignments)
+        // Check for existing match
+        var match = await _context.Matches
+            .Include(m => m.MatchAssignments)
+            .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == matchDate);
+
+        if (match != null)
         {
-            match.MatchAssignments.Add(new MatchAssignment
+            // Update existing match
+            match.Location = request.Location ?? match.Location;
+            match.FormatType = request.FormatType;
+            
+            // Update assignments
+            // Remove existing assignments
+            _context.MatchAssignments.RemoveRange(match.MatchAssignments);
+            
+            // Add new assignments
+            foreach (var assignment in request.Assignments)
             {
-                MatchId = match.Id,
-                PlayerId = assignment.PlayerId,
-                TeamNumber = assignment.TeamNumber
-            });
+                _context.MatchAssignments.Add(new MatchAssignment
+                {
+                    MatchId = match.Id,
+                    PlayerId = assignment.PlayerId,
+                    TeamNumber = assignment.TeamNumber
+                });
+            }
+            
+            await _context.SaveChangesAsync();
+            return Ok(match);
         }
+        else
+        {
+            // Create new match
+            match = new Match
+            {
+                Id = Guid.NewGuid(),
+                LeagueId = leagueId,
+                Date = matchDate,
+                Location = request.Location ?? league?.Location,
+                FormatType = request.FormatType,
+                IsCompleted = false
+            };
 
-        _context.Matches.Add(match);
-        await _context.SaveChangesAsync();
-        
-        return CreatedAtAction(nameof(GetMatch), new { id = match.Id }, match);
+            foreach (var assignment in request.Assignments)
+            {
+                match.MatchAssignments.Add(new MatchAssignment
+                {
+                    MatchId = match.Id,
+                    PlayerId = assignment.PlayerId,
+                    TeamNumber = assignment.TeamNumber
+                });
+            }
+
+            _context.Matches.Add(match);
+            await _context.SaveChangesAsync();
+            
+            return CreatedAtAction(nameof(GetMatch), new { id = match.Id }, match);
+        }
     }
 
     [HttpGet("{id}")]
@@ -178,12 +216,12 @@ public class MatchesController : ControllerBase
             .Select(ma => ma.MatchId)
             .ToListAsync();
 
-        var performance = await _context.RawRatings
-            .Where(r => r.SubjectId == player.Id && recentMatches.Contains(r.MatchId))
+        var performance = await _context.PlayerRatings
+            .Where(r => r.RatedPlayerId == player.Id && recentMatches.Contains(r.MatchId))
             .GroupBy(r => r.MatchId)
             .Select(g => new { 
                 Date = _context.Matches.Where(m => m.Id == g.Key).Select(m => m.Date).FirstOrDefault(),
-                Value = Math.Round(g.Average(r => r.Value), 1)
+                Value = Math.Round(g.Average(r => r.Rating), 1)
             })
             .OrderByDescending(x => x.Date)
             .ToListAsync();
@@ -199,7 +237,7 @@ public class MatchesController : ControllerBase
         DateTime? pendingRatingMatchDate = null;
         foreach (var match in matchesNeedingRatings)
         {
-            var hasRated = await _context.RawRatings.AnyAsync(r => r.MatchId == match.Id && r.RaterId == player.Id);
+            var hasRated = await _context.PlayerRatings.AnyAsync(r => r.MatchId == match.Id && r.RaterId == player.Id);
             if (!hasRated)
             {
                 pendingRatingMatchDate = match.Date;
@@ -216,7 +254,7 @@ public class MatchesController : ControllerBase
         });
     }
 
-    [HttpPost("{id}/ratings")]
+    [HttpPost("{id}/submit-ratings")]
     public async Task<IActionResult> SubmitRatings(Guid id, [FromBody] List<RatingSubmissionDto> ratings)
     {
         var userId = User.FindFirstValue("userId");
@@ -231,26 +269,12 @@ public class MatchesController : ControllerBase
         var wasParticipant = match.MatchAssignments.Any(ma => ma.PlayerId == rater.Id);
         if (!wasParticipant) return StatusCode(403, "Only players who participated in this match can submit ratings.");
 
-        // Check if already rated
-        var existingRating = await _context.RawRatings.AnyAsync(r => r.MatchId == id && r.RaterId == rater.Id);
-        if (existingRating) return BadRequest("You have already rated players for this match.");
+        // Verify all subjects are in the match
+        var validRatings = ratings.Where(r => match.MatchAssignments.Any(ma => ma.PlayerId == r.SubjectId)).ToList();
 
-        foreach (var r in ratings)
-        {
-            // Verify subject is in the match
-            if (!match.MatchAssignments.Any(ma => ma.PlayerId == r.SubjectId)) continue;
+        // Use new rating service (allows re-rating, saves to PlayerRatings table, updates averages)
+        await _ratingService.SaveMatchRatingsAsync(id, rater.Id, validRatings);
 
-            _context.RawRatings.Add(new RawRating
-            {
-                Id = Guid.NewGuid(),
-                MatchId = id,
-                RaterId = rater.Id,
-                SubjectId = r.SubjectId,
-                Value = r.Value
-            });
-        }
-
-        await _context.SaveChangesAsync();
         return Ok(new { Message = "Ratings submitted successfully" });
     }
 
@@ -261,9 +285,9 @@ public class MatchesController : ControllerBase
         var rater = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId);
         if (rater == null) return Unauthorized();
 
-        var ratings = await _context.RawRatings
+        var ratings = await _context.PlayerRatings
             .Where(r => r.MatchId == id && r.RaterId == rater.Id)
-            .Select(r => new { r.SubjectId, r.Value })
+            .Select(r => new { SubjectId = r.RatedPlayerId, Value = r.Rating })
             .ToListAsync();
 
         return Ok(ratings);
@@ -295,10 +319,26 @@ public class MatchesController : ControllerBase
             .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (player == null) return NotFound("Player not found");
 
-        // Get or create match for the date
-        var match = await _context.Matches
-            .Include(m => m.MatchAssignments)
-            .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == request.Date.Date);
+        // Standardize date to UTC midnight to avoid timezone mismatches
+        var matchDate = request.Date.ToUniversalTime().Date;
+
+        Match? match = null;
+
+        // Try to find by ID first if provided
+        if (request.MatchId.HasValue)
+        {
+            match = await _context.Matches
+                .Include(m => m.MatchAssignments)
+                .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Id == request.MatchId.Value);
+        }
+
+        // Fallback to date lookup if ID not provided or not found
+        if (match == null)
+        {
+            match = await _context.Matches
+                .Include(m => m.MatchAssignments)
+                .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == matchDate);
+        }
 
         if (match == null)
         {
@@ -307,8 +347,8 @@ public class MatchesController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 LeagueId = leagueId,
-                Date = request.Date,
-                FormatType = "5v5",
+                Date = matchDate,
+                FormatType = request.FormatType ?? "5v5",
                 IsCompleted = false
             };
             _context.Matches.Add(match);
@@ -350,11 +390,9 @@ public class MatchesController : ControllerBase
     }
 }
 
-public record RatingSubmissionDto(Guid SubjectId, int Value);
-
 public record CreateMatchRequest(DateTime Date, string FormatType, string? Location, List<AssignmentDto> Assignments);
 public record AssignmentDto(Guid PlayerId, int TeamNumber);
 
 public record TeamCalculationRequest(List<Guid> PlayerIds, int TeamCount);
 
-public record ToggleParticipationRequest(DateTime Date, bool IsParticipating);
+public record ToggleParticipationRequest(DateTime Date, bool IsParticipating, Guid? MatchId = null, string? FormatType = null);

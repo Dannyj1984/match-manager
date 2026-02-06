@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Users, Wand2, Play, Plus, Save, Calendar as CalendarIcon, Search, CheckCircle2, Star } from 'lucide-vue-next'
+import { Users, Wand2, Save, Calendar as CalendarIcon, CheckCircle2, Star } from 'lucide-vue-next'
 
 const store = useMatchStore()
-const { data } = useAuth()
 const modal = useModal()
 
 const route = useRoute()
@@ -58,8 +57,11 @@ const formatDate = (dateStr: string) => {
 const handleCompleteMatch = async () => {
   const matchId = store.currentMatchId
   if (!matchId) return
-
-  if (!confirm('Are you sure you want to complete this match? Ratings will be locked and player averages updated.')) return
+  const confirmed = await modal.showConfirm(
+    `Are you sure you want to complete this match? Ratings will be locked and player averages updated.`,
+    'Complete Match'
+  )
+  if (!confirmed) return
 
   const result = await store.completeMatch(matchId)
   if (result.success) {
@@ -76,7 +78,7 @@ const isParticipating = computed(() => {
 
 const handleToggleParticipation = async () => {
   const newState = !isParticipating.value
-  const result = await store.toggleSelfParticipation(store.matchDate, newState)
+  const result = await store.toggleSelfParticipation(store.matchDate, newState, store.currentMatchId || undefined, store.formatType)
 
   if (result.success) {
     modal.showSuccess(result.message || (newState ? "You're in!" : "You're out"))
@@ -132,7 +134,7 @@ definePageMeta({
 
         <div v-if="isAdmin" class="space-y-1.5 flex flex-col">
           <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Team Count</label>
-          <select v-model="store.teamsCount"
+          <select v-model="store.teamsCount" @change="store.updateFormatType()"
             class="bg-slate-900/50 border border-white/5 rounded-xl py-2 px-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all cursor-pointer min-w-[100px]">
             <option :value="2">2 Teams</option>
             <option :value="3">3 Teams</option>
@@ -140,17 +142,28 @@ definePageMeta({
           </select>
         </div>
 
+        <div v-if="isAdmin" class="space-y-1.5 flex flex-col">
+          <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Max Players</label>
+          <input type="number" v-model.number="store.maxPlayers" @input="store.updateFormatType()" min="4" max="50"
+            step="1"
+            class="bg-slate-900/50 border border-white/5 rounded-xl py-2 px-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all w-20" />
+        </div>
+
+        <div v-if="isAdmin" class="hidden md:flex flex-col items-center justify-center px-2">
+          <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Format</span>
+          <span class="text-xs font-black text-primary">{{ store.formatType }}</span>
+        </div>
+
         <div v-if="isAdmin" class="h-10 w-px bg-white/5 hidden md:block"></div>
 
-        <div v-if="isAdmin" class="flex items-center gap-2">
+        <div v-if="isAdmin" class="flex items-center gap-2 flex-wrap">
           <button v-if="!store.isCompleted" @click="handleGenerateTeams"
             :disabled="store.selectedPlayerIds.length === 0 || store.isLoading"
             class="flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg shadow-primary/20 active:scale-95 whitespace-nowrap">
             <Wand2 :size="16" :class="{ 'animate-spin': store.isLoading }" />
             GENERATE TEAMS
           </button>
-          <button v-if="!store.isCompleted" @click="handleSaveMatch"
-            :disabled="Object.keys(store.teams).length === 0 || store.isLoading"
+          <button v-if="!store.isCompleted" @click="handleSaveMatch" :disabled="store.isLoading"
             class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-xs transition-all border border-white/5 active:scale-95 whitespace-nowrap">
             <Save :size="16" />
             SAVE MATCH
@@ -224,11 +237,29 @@ definePageMeta({
                     <span v-if="playerId === store.currentPlayerId"
                       class="text-[10px] text-emerald-400 font-black uppercase">(You)</span>
                   </div>
-                  <div class="flex items-center gap-1 text-yellow-500">
-                    <Star :size="12" :fill="'currentColor'" />
-                    <span class="font-bold">{{
-                      store.availablePlayers.find(p => p.id === playerId)?.currentRating || '?'
-                    }}</span>
+                  <div class="flex items-center gap-3">
+                    <!-- Average Match Rating -->
+                    <div v-if="store.availablePlayers.find(p => p.id === playerId)?.avgMatchRating"
+                      class="flex items-center gap-1 text-emerald-400" title="Avg Match Rating (Last 6 Months)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v18h18" />
+                        <path d="M18 17V9" />
+                        <path d="M13 17V5" />
+                        <path d="M8 17v-3" />
+                      </svg>
+                      <span class="font-bold">{{
+                        store.availablePlayers.find(p => p.id === playerId)?.avgMatchRating?.toFixed(1)
+                      }}</span>
+                    </div>
+
+                    <!-- Ability Rating -->
+                    <div class="flex items-center gap-1 text-yellow-500" title="Player Ability">
+                      <Star :size="12" :fill="'currentColor'" />
+                      <span class="font-bold">{{
+                        store.availablePlayers.find(p => p.id === playerId)?.currentRating || '?'
+                      }}</span>
+                    </div>
                   </div>
                 </div>
                 <div v-if="store.selectedPlayerIds.length === 0" class="text-xs text-slate-500 italic py-2">
@@ -245,7 +276,8 @@ definePageMeta({
         </div>
 
         <!-- Scrollable Teams Grid -->
-        <div v-if="Object.keys(store.teams).length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
+        <div v-if="Object.values(store.teams).some(players => players.length > 0)"
+          class="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
           <div v-for="n in store.teamsCount" :key="n">
             <TeamColumn :title="`Team ${String.fromCharCode(64 + n)}`" :team-number="n" v-model:players="store.teams[n]"
               :power-score="store.teamPower(n).toFixed(1)" />
@@ -253,7 +285,7 @@ definePageMeta({
         </div>
 
         <!-- No Match State -->
-        <div v-else
+        <div v-else-if="!store.matchDate"
           class="flex flex-col items-center justify-center py-20 bg-white/5 border border-dashed border-white/10 rounded-3xl">
           <CalendarIcon :size="48" class="text-slate-700 mb-4" />
           <h3 class="text-xl font-bold text-slate-400">No match scheduled</h3>
@@ -272,6 +304,14 @@ definePageMeta({
               JUMP TO {{ formatDate(store.nextMatchDate) }}
             </button>
           </div>
+        </div>
+        <div v-else
+          class="flex flex-col items-center justify-center py-20 bg-white/5 border border-dashed border-white/10 rounded-3xl">
+          <CalendarIcon :size="48" class="text-slate-700 mb-4" />
+          <h3 class="text-xl font-bold text-slate-400">Match scheduled</h3>
+          <p class="text-slate-500 text-sm mb-6">Teams will be available shortly</p>
+
+
         </div>
       </div>
     </div>

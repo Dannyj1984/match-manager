@@ -60,7 +60,7 @@ builder.Services.AddDbContext<FairPlayDbContext>(options =>
 
 // Register Services
 builder.Services.AddScoped<ITeamBalancerService, TeamBalancerService>();
-builder.Services.AddScoped<IRatingUpdateService, RatingUpdateService>();
+builder.Services.AddScoped<IMatchRatingService, MatchRatingService>();
 
 var app = builder.Build();
 
