@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Users, Star, Calendar, ShieldCheck, Search, Edit2, X, Check } from 'lucide-vue-next'
+import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check, Activity } from 'lucide-vue-next'
+
+definePageMeta({
+    middleware: ['auth', 'league', 'member']
+})
 
 const store = useMatchStore()
-
+const { currentLeague } = useLeague()
 const { data } = useAuth()
-const isAdmin = computed(() => (data.value as any)?.user?.roles?.includes('Admin'))
 
+const isAdmin = computed(() => {
+    // Check for Super Admin
+    if ((data.value as any)?.user?.isSuperAdmin) return true
+
+    // Check for League Admin
+    return currentLeague.value?.role === 'Admin' || currentLeague.value?.role === 'SuperAdmin'
+})
+
+const modal = useModal()
 const isModalOpen = ref(false)
 const searchQuery = ref('')
 const editingPlayerId = ref<string | null>(null)
@@ -21,18 +33,41 @@ const filteredPlayers = computed(() => {
     )
 })
 
-onMounted(async () => {
-    await store.fetchPlayers()
-})
+watch(currentLeague, async (newLeague) => {
+    if (newLeague) {
+        await store.fetchPlayers()
+    }
+}, { immediate: true })
 
 const handlePromote = async (player: any) => {
-    if (!confirm(`Are you sure you want to promote ${player.fullName} to Admin?`)) return
+    const confirmed = await modal.showConfirm(
+        `Are you sure you want to promote ${player.fullName} to Admin?`,
+        'Promote to Admin'
+    )
+    if (!confirmed) return
 
     const result = await store.promoteToAdmin(player.id)
     if (result.success) {
-        alert(`${player.fullName} is now an Admin.`)
+        modal.showSuccess(`${player.fullName} is now an Admin.`)
+        // Refresh to get updated role
+        await store.fetchPlayers()
     } else {
-        alert(result.error)
+        modal.showError(result.error || 'Failed to promote player')
+    }
+}
+
+const handleDemote = async (player: any) => {
+    const confirmed = await modal.showConfirm(
+        `Are you sure you want to demote ${player.fullName} to Member?`,
+        'Demote to Member'
+    )
+    if (!confirmed) return
+
+    const result = await store.demoteToMember(player.id)
+    if (result.success) {
+        modal.showSuccess(`${player.fullName} is now a Member.`)
+    } else {
+        modal.showError(result.error || 'Failed to demote player')
     }
 }
 
@@ -48,7 +83,7 @@ const cancelEditRating = () => {
 
 const saveRating = async (player: any) => {
     if (editingRating.value < 1 || editingRating.value > 10) {
-        alert('Rating must be between 1 and 10')
+        modal.showError('Rating must be between 1 and 10')
         return
     }
 
@@ -127,23 +162,49 @@ const formatDate = (dateString?: string) => {
                             <X :size="18" />
                         </button>
                     </div>
-                    <div v-else class="flex items-center gap-2">
-                        <div class="bg-primary/10 text-primary px-3 py-1 rounded-lg font-black flex items-center gap-1">
-                            <Star :size="14" class="fill-primary" />
-                            {{ player.currentRating }}
+                    <div v-else class="flex items-center gap-3">
+                        <!-- Avg Match Rating -->
+                        <div v-if="player.avgMatchRating" class="flex flex-col items-end">
+                            <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Avg Match</span>
+                            <div class="text-emerald-400 font-black flex items-center gap-1">
+                                <Activity :size="14" />
+                                {{ Number(player.avgMatchRating).toFixed(1) }}
+                            </div>
                         </div>
+
+                        <!-- Ability Rating -->
+                        <div class="flex flex-col items-end">
+                            <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Ability</span>
+                            <div
+                                class="bg-primary/10 text-primary px-3 py-1 rounded-lg font-black flex items-center gap-1">
+                                <Star :size="14" class="fill-primary" />
+                                {{ player.currentRating }}
+                            </div>
+                        </div>
+
                         <button v-if="isAdmin" @click="startEditRating(player)"
-                            class="text-slate-500 hover:text-primary transition-colors">
+                            class="text-slate-500 hover:text-primary transition-colors pb-1">
                             <Edit2 :size="16" />
                         </button>
                     </div>
                 </div>
 
-                <div v-if="isAdmin" class="pt-2 border-t border-white/5 mt-auto">
+                <div v-if="isAdmin && player.role !== 'Admin' && player.role !== 'SuperAdmin'"
+                    class="pt-2 border-t border-white/5 mt-auto">
                     <button @click="handlePromote(player)"
                         class="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 group">
                         <ShieldCheck :size="14" class="group-hover:text-primary transition-colors" />
                         PROMOTE TO ADMIN
+                    </button>
+                </div>
+
+                <!-- Demote button - only for admins who are not the current user -->
+                <div v-if="isAdmin && (player.role === 'Admin' || player.role === 'SuperAdmin') && player.id !== (data as any)?.user?.playerId"
+                    class="pt-2 border-t border-white/5 mt-auto">
+                    <button @click="handleDemote(player)"
+                        class="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 text-xs font-bold transition-all flex items-center justify-center gap-2 group">
+                        <ShieldMinus :size="14" class="group-hover:text-red-500 transition-colors" />
+                        DEMOTE TO MEMBER
                     </button>
                 </div>
             </div>

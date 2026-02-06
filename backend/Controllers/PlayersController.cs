@@ -1,5 +1,6 @@
 using FairPlay.Api.Data;
 using FairPlay.Api.Models;
+using FairPlay.Api.Middleware;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -27,16 +28,25 @@ public class PlayersController : ControllerBase
     }
 
     [HttpGet]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
     public async Task<IActionResult> GetPlayers()
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var players = await _context.Players
+            .Where(p => p.LeagueId == leagueId)
             .OrderByDescending(p => p.CurrentRating)
             .Select(p => new {
                 p.Id,
                 p.FullName,
                 p.CurrentRating,
                 p.PreferredPosition,
-                p.LastPlayed
+                p.LastPlayed,
+                p.IdentityUserId,
+                Role = _context.LeagueMemberships
+                    .Where(lm => lm.LeagueId == leagueId && lm.UserId == p.IdentityUserId)
+                    .Select(lm => lm.Role)
+                    .FirstOrDefault()
             })
             .ToListAsync();
             
@@ -44,12 +54,15 @@ public class PlayersController : ControllerBase
     }
 
     [HttpGet("me")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
     [Authorize]
     public async Task<IActionResult> GetMe()
     {
         var userId = User.FindFirstValue("userId");
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var player = await _context.Players
-            .FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+            .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
             
         if (player == null) return NotFound();
 
@@ -63,12 +76,15 @@ public class PlayersController : ControllerBase
     }
 
     [HttpPut("me")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
     [Authorize]
     public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileRequest request)
     {
         var userId = User.FindFirstValue("userId");
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var player = await _context.Players
-            .FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+            .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
             
         if (player == null) return NotFound();
 
@@ -81,7 +97,8 @@ public class PlayersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
+    [LeagueAdmin]
     public async Task<IActionResult> Create([FromBody] CreatePlayerRequest request)
     {
         if (await _userManager.FindByEmailAsync(request.Email) != null)
@@ -89,7 +106,7 @@ public class PlayersController : ControllerBase
             return BadRequest(new { Message = "Email already in use" });
         }
 
-        var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
+        var user = new ApplicationUser { UserName = request.Email, Email = request.Email, EmailConfirmed = true };
         var result = await _userManager.CreateAsync(user, request.InitialPassword);
 
         if (!result.Succeeded) return BadRequest(result.Errors);
@@ -100,17 +117,30 @@ public class PlayersController : ControllerBase
         await _userManager.AddToRoleAsync(user, "User");
 
         // Create player record
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        
         var player = new Player
         {
             Id = Guid.NewGuid(),
+            LeagueId = leagueId,
             FullName = request.FullName,
             CurrentRating = request.InitialRating,
             PreferredPosition = request.PreferredPosition,
             IdentityUserId = user.Id
         };
         _context.Players.Add(player);
-        
-        user.PlayerId = player.Id;
+
+        // Add to league as Member
+        var membership = new LeagueMembership
+        {
+            Id = Guid.NewGuid(),
+            LeagueId = leagueId,
+            UserId = user.Id,
+            Role = "Member",
+            JoinedDate = DateTime.UtcNow
+        };
+        _context.LeagueMemberships.Add(membership);
+
         await _context.SaveChangesAsync();
 
         return Ok(new { 
@@ -118,39 +148,64 @@ public class PlayersController : ControllerBase
             player.FullName, 
             player.CurrentRating,
             player.PreferredPosition,
-            Message = "Player and user created successfully" 
+            Message = "Player created and added to league successfully" 
         });
     }
 
     [HttpPost("{id}/promote")]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
+    [LeagueAdmin]
     public async Task<IActionResult> Promote(Guid id)
     {
         var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == id);
         if (player == null) return NotFound(new { Message = "Player not found" });
 
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        if (player.LeagueId != leagueId) return BadRequest(new { Message = "Player is not in this league" });
+
         if (string.IsNullOrEmpty(player.IdentityUserId))
             return BadRequest(new { Message = "Player has no associated user account" });
 
-        var user = await _userManager.FindByIdAsync(player.IdentityUserId);
-        if (user == null) return NotFound(new { Message = "User not found" });
+        // Update League Membership Role
+        var membership = await _context.LeagueMemberships
+            .FirstOrDefaultAsync(lm => lm.LeagueId == leagueId && lm.UserId == player.IdentityUserId);
+            
+        if (membership == null) return NotFound(new { Message = "League membership not found" });
 
-        // Ensure Admin role exists
-        if (!await _roleManager.RoleExistsAsync("Admin"))
-            await _roleManager.CreateAsync(new IdentityRole("Admin"));
+        membership.Role = "Admin";
+        await _context.SaveChangesAsync();
 
-        // Add to role if not already in it
-        if (!await _userManager.IsInRoleAsync(user, "Admin"))
-        {
-            var result = await _userManager.AddToRoleAsync(user, "Admin");
-            if (!result.Succeeded) return BadRequest(result.Errors);
-        }
+        return Ok(new { Message = $"{player.FullName} promoted to League Admin successfully" });
+    }
 
-        return Ok(new { Message = $"{player.FullName} promoted to Admin successfully" });
+    [HttpPost("{id}/demote")]
+    [LeagueContext(required: true, restrictSuperAdmin: true)]
+    [LeagueAdmin]
+    public async Task<IActionResult> Demote(Guid id)
+    {
+        var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == id);
+        if (player == null) return NotFound(new { Message = "Player not found" });
+
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
+        if (player.LeagueId != leagueId) return BadRequest(new { Message = "Player is not in this league" });
+
+        if (string.IsNullOrEmpty(player.IdentityUserId))
+            return BadRequest(new { Message = "Player has no associated user account" });
+
+        // Update League Membership Role
+        var membership = await _context.LeagueMemberships
+            .FirstOrDefaultAsync(lm => lm.LeagueId == leagueId && lm.UserId == player.IdentityUserId);
+            
+        if (membership == null) return NotFound(new { Message = "League membership not found" });
+
+        membership.Role = "Member";
+        await _context.SaveChangesAsync();
+
+        return Ok(new { Message = $"{player.FullName} demoted to League Member successfully" });
     }
 
     [HttpPatch("{id}/rating")]
-    [Authorize(Roles = "Admin")]
+    [LeagueContext(restrictSuperAdmin: true), LeagueAdmin]
     public async Task<IActionResult> UpdateRating(Guid id, [FromBody] UpdateRatingRequest request)
     {
         var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == id);

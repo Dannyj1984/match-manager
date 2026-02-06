@@ -2,6 +2,9 @@
 import { useMatchStore } from '@/stores/match'
 import { User, Mail, Star, Save, Loader2, CheckCircle } from 'lucide-vue-next'
 
+const { currentLeague } = useLeague()
+const { getPositionsForSport } = useSportPositions()
+
 const store = useMatchStore()
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -13,6 +16,11 @@ const form = reactive({
     fullName: '',
     preferredPosition: 'M',
     currentRating: 0
+})
+
+// Get positions for current league's sport
+const availablePositions = computed(() => {
+    return getPositionsForSport(currentLeague.value?.sport || 'Football')
 })
 
 onMounted(async () => {
@@ -47,7 +55,7 @@ const handleSave = async () => {
 }
 
 definePageMeta({
-    middleware: 'auth'
+    middleware: ['auth', 'league', 'member']
 })
 </script>
 
@@ -151,7 +159,7 @@ definePageMeta({
                                         <Star :size="12" /> Preferred Position
                                     </label>
                                     <div class="grid grid-cols-4 gap-4">
-                                        <button v-for="pos in ['GK', 'D', 'M', 'A']" :key="pos" type="button"
+                                        <button v-for="pos in availablePositions" :key="pos" type="button"
                                             @click="form.preferredPosition = pos" :class="[
                                                 'py-4 rounded-2xl border text-sm font-black transition-all group relative overflow-hidden',
                                                 form.preferredPosition === pos

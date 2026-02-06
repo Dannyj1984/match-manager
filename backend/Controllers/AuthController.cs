@@ -62,8 +62,6 @@ public class AuthController : ControllerBase
             IdentityUserId = user.Id
         };
         _context.Players.Add(player);
-        
-        user.PlayerId = player.Id;
         await _context.SaveChangesAsync();
 
         return Ok(new { Message = "User registered successfully" });
@@ -84,7 +82,8 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.Name, user.UserName!),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("userId", user.Id),
-            new Claim("playerId", player?.Id.ToString() ?? "")
+            new Claim("playerId", player?.Id.ToString() ?? ""),
+            new Claim("isSuperAdmin", user.IsSuperAdmin.ToString())
         };
 
         foreach (var role in roles)
@@ -106,7 +105,7 @@ public class AuthController : ControllerBase
         {
             token = new JwtSecurityTokenHandler().WriteToken(token),
             expiration = token.ValidTo,
-            user = new { user.Email, roles, playerId = player?.Id }
+            user = new { user.Email, roles, playerId = player?.Id, isSuperAdmin = user.IsSuperAdmin }
         });
     }
 
@@ -123,7 +122,7 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            user = new { user.Email, roles, playerId = player?.Id }
+            user = new { user.Email, roles, playerId = player?.Id, isSuperAdmin = user.IsSuperAdmin }
         });
     }
 }

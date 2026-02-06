@@ -1,5 +1,6 @@
 using FairPlay.Api.Data;
 using FairPlay.Api.Models;
+using FairPlay.Api.Middleware;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FairPlay.Api.Controllers;
@@ -16,6 +17,7 @@ public class RatingsController : ControllerBase
     }
 
     [HttpPost("submit")]
+    [LeagueContext(restrictSuperAdmin: true)]
     public async Task<IActionResult> SubmitRatings([FromBody] List<RawRating> ratings)
     {
         if (ratings == null || !ratings.Any()) return BadRequest("No ratings provided.");

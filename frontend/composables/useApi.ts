@@ -1,6 +1,7 @@
 export const useApi = () => {
     const { token } = useAuth()
     const config = useRuntimeConfig()
+    const currentLeague = useState<any>('currentLeague')
 
     const fetch = async <T>(path: string, options: any = {}) => {
 
@@ -10,6 +11,11 @@ export const useApi = () => {
 
         if (token.value) {
             headers['Authorization'] = token.value
+        }
+
+        // Automatically inject league ID header if current league is set
+        if (currentLeague.value?.id && !headers['X-League-Id']) {
+            headers['X-League-Id'] = currentLeague.value.id
         }
 
         return await $fetch<T>(path, {

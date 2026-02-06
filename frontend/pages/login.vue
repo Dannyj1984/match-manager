@@ -18,7 +18,6 @@ const handleLogin = async () => {
 
   try {
     const result = await signIn(form, { redirect: false })
-    console.log('result', result)
     if (result?.error) {
       error.value = 'Invalid email or password'
     } else {

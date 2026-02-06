@@ -2,13 +2,18 @@
 import { useMatchStore } from '@/stores/match'
 import { Play, Users, Trophy, ChevronRight, Activity, Calendar, Star, TrendingUp } from 'lucide-vue-next'
 
+definePageMeta({
+  middleware: ['league']
+})
+
 const store = useMatchStore()
-const { status } = useAuth()
+const { status, data } = useAuth()
 const dashboardData = ref<{
   lastCompletedMatchDate: string,
   nextActiveMatchDate: string,
   pendingRatingMatchDate?: string,
   recentPerformance: { date: string, value: number }[]
+  needsLeague?: boolean
 }>({
   lastCompletedMatchDate: '',
   nextActiveMatchDate: '',
@@ -16,13 +21,21 @@ const dashboardData = ref<{
 })
 const isLoading = ref(false)
 
-onMounted(async () => {
-  if (status.value === 'authenticated') {
+const { currentLeague } = useLeague()
+
+watchEffect(() => {
+  if (status.value === 'authenticated' && (data.value as any)?.user?.isSuperAdmin === true) {
+    navigateTo('/leagues')
+  }
+})
+
+watch(currentLeague, async (newLeague) => {
+  if (status.value === 'authenticated' && newLeague) {
     isLoading.value = true
     dashboardData.value = await store.fetchDashboard()
     isLoading.value = false
   }
-})
+}, { immediate: true })
 </script>
 
 <template>

@@ -29,11 +29,23 @@ const resetForm = () => {
     error.value = ''
 }
 
+
+const { currentLeague } = useLeague()
+const leaguePositions = currentLeague.value?.sport === "Netball" ? ['GK', 'GD', 'WD', 'C', 'WA', 'GA', 'GS'] : ['GK', 'D', 'M', 'A']
 const handleSubmit = async () => {
     isLoading.value = true
     error.value = ''
 
-    const result = await store.createPlayer(form)
+    if (!currentLeague.value?.id) {
+        error.value = 'No active league selected'
+        isLoading.value = false
+        return
+    }
+
+    const result = await store.createPlayer({
+        ...form,
+        leagueId: currentLeague.value.id
+    })
 
     if (result.success) {
         resetForm()
@@ -111,7 +123,7 @@ const handleSubmit = async () => {
                             <Star :size="12" /> Preferred Position
                         </label>
                         <div class="grid grid-cols-4 gap-2">
-                            <button v-for="pos in ['GK', 'D', 'M', 'A']" :key="pos" type="button"
+                            <button v-for="pos in leaguePositions" :key="pos" type="button"
                                 @click="form.preferredPosition = pos" :class="[
                                     'py-2.5 rounded-xl border text-xs font-black transition-all',
                                     form.preferredPosition === pos

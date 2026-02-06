@@ -3,6 +3,7 @@ using System;
 using FairPlay.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FairPlay.Api.Data.Migrations
 {
     [DbContext(typeof(FairPlayDbContext))]
-    partial class FairPlayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260206095522_AddCostToLeague")]
+    partial class AddCostToLeague
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -225,9 +228,6 @@ namespace FairPlay.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("AvgMatchRating")
-                        .HasColumnType("numeric");
-
                     b.Property<decimal>("CurrentRating")
                         .HasColumnType("numeric");
 
@@ -260,38 +260,6 @@ namespace FairPlay.Api.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Players");
-                });
-
-            modelBuilder.Entity("FairPlay.Api.Models.PlayerRating", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid>("MatchId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RatedPlayerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RaterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MatchId");
-
-                    b.HasIndex("RatedPlayerId");
-
-                    b.HasIndex("RaterId");
-
-                    b.ToTable("PlayerRatings");
                 });
 
             modelBuilder.Entity("FairPlay.Api.Models.RawRating", b =>
@@ -528,33 +496,6 @@ namespace FairPlay.Api.Data.Migrations
                     b.Navigation("League");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("FairPlay.Api.Models.PlayerRating", b =>
-                {
-                    b.HasOne("FairPlay.Api.Models.Match", "Match")
-                        .WithMany()
-                        .HasForeignKey("MatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("FairPlay.Api.Models.Player", "RatedPlayer")
-                        .WithMany()
-                        .HasForeignKey("RatedPlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("FairPlay.Api.Models.Player", "Rater")
-                        .WithMany()
-                        .HasForeignKey("RaterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Match");
-
-                    b.Navigation("RatedPlayer");
-
-                    b.Navigation("Rater");
                 });
 
             modelBuilder.Entity("FairPlay.Api.Models.RawRating", b =>

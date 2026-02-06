@@ -5,9 +5,10 @@ namespace FairPlay.Api.Models;
 
 public class ApplicationUser : IdentityUser
 {
-    // Link to the Player entity
-    public Guid? PlayerId { get; set; }
-
+    // Super Admin flag
+    public bool IsSuperAdmin { get; set; } = false;
+    
+    // Navigation properties
     [JsonIgnore]
-    public Player? Player { get; set; }
+    public List<LeagueMembership> LeagueMemberships { get; set; } = new();
 }

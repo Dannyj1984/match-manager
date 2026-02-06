@@ -4,8 +4,11 @@ export interface Player {
     id: string
     fullName: string
     currentRating: number
+    avgMatchRating?: number // Average rating from last 6 months of matches
     preferredPosition: string
     lastPlayed?: string
+    role?: string // LeagueMembership role: 'Admin', 'Member', 'SuperAdmin'
+    identityUserId?: string // User ID to check for self-demotion
 }
 
 export interface MatchAssignment {
@@ -25,6 +28,7 @@ export const useMatchStore = defineStore('match', {
 
         // New Draft Config
         teamsCount: 2,
+        maxPlayers: 10,
         matchDate: new Date().toISOString().split('T')[0],
         formatType: '5v5',
         nextMatchDate: null as string | null,
@@ -62,11 +66,17 @@ export const useMatchStore = defineStore('match', {
             }
         },
 
-        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number }) {
+        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number, preferredPosition: string, leagueId?: string }) {
             const { fetch } = useApi()
             try {
+                const headers: Record<string, string> = {}
+                if (playerData.leagueId) {
+                    headers['X-League-Id'] = playerData.leagueId
+                }
+
                 const newPlayer = await fetch<Player>('/players', {
                     method: 'POST',
+                    headers,
                     body: playerData
                 })
                 this.availablePlayers.push(newPlayer)
@@ -88,6 +98,43 @@ export const useMatchStore = defineStore('match', {
             } catch (error: any) {
                 console.error('Failed to promote player', error)
                 return { success: false, error: error.data?.message || 'Failed to promote player' }
+            }
+        },
+
+        async demoteToMember(playerId: string) {
+            const { fetch } = useApi()
+            try {
+                await fetch(`/players/${playerId}/demote`, {
+                    method: 'POST'
+                })
+                // Refresh player list to get updated roles
+                await this.fetchPlayers()
+                return { success: true }
+            } catch (error: any) {
+                console.error('Failed to demote player', error)
+                return { success: false, error: error.data?.message || 'Failed to demote player' }
+            }
+        },
+
+        async toggleSelfParticipation(date: string, isParticipating: boolean, matchId?: string, formatType?: string) {
+            const { fetch } = useApi()
+            try {
+                const result = await fetch<{ success: boolean, isParticipating: boolean, message: string }>('/matches/toggle-participation', {
+                    method: 'POST',
+                    body: { date, isParticipating, matchId, formatType }
+                })
+
+                // Refresh match data
+                if (matchId) {
+                    await this.fetchMatch(matchId)
+                } else {
+                    await this.fetchMatchByDate(date)
+                }
+
+                return { success: true, message: result.message }
+            } catch (error: any) {
+                console.error('Failed to toggle participation', error)
+                return { success: false, error: error.data?.message || 'Failed to update participation' }
             }
         },
 
@@ -151,16 +198,29 @@ export const useMatchStore = defineStore('match', {
             this.isLoading = true
             try {
                 const assignments = []
-                for (const [teamNum, players] of Object.entries(this.teams)) {
-                    for (const player of players) {
+
+                // Check if teams have been generated AND have players assigned
+                const hasTeamAssignments = Object.values(this.teams).some(players => players.length > 0)
+
+                if (hasTeamAssignments) {
+                    for (const [teamNum, players] of Object.entries(this.teams)) {
+                        for (const player of players) {
+                            assignments.push({
+                                playerId: player.id,
+                                teamNumber: parseInt(teamNum)
+                            })
+                        }
+                    }
+                } else {
+                    for (const playerId of this.selectedPlayerIds) {
                         assignments.push({
-                            playerId: player.id,
-                            teamNumber: parseInt(teamNum)
+                            playerId: playerId,
+                            teamNumber: 0
                         })
                     }
                 }
 
-                await fetch('/matches', {
+                const match = await fetch<any>('/matches', {
                     method: 'POST',
                     body: {
                         date: this.matchDate,
@@ -168,10 +228,108 @@ export const useMatchStore = defineStore('match', {
                         assignments: assignments
                     }
                 })
+                if (match && (match.id || match.Id)) {
+                    this.currentMatchId = match.id || match.Id
+                    this.isCompleted = match.isCompleted || match.IsCompleted
+                    // Update format type if returned (e.g. standardized by backend)
+                    if (match.FormatType || match.formatType) {
+                        this.formatType = match.FormatType || match.formatType
+                    }
+                }
+
                 return { success: true }
             } catch (error: any) {
                 console.error('Failed to save match', error)
                 return { success: false, error: error.data?.message || 'Failed to save match' }
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        updateFormatType() {
+            // Calculate format type based on maxPlayers and teamsCount
+            // e.g. 10 players / 2 teams = 5 -> "5v5"
+            // e.g. 15 players / 3 teams = 5 -> "5v5v5"
+
+            const playersPerTeam = Math.floor(this.maxPlayers / this.teamsCount)
+            this.formatType = Array(this.teamsCount).fill(playersPerTeam).join('v')
+        },
+
+        async fetchMatch(matchId: string) {
+            const { fetch } = useApi()
+            this.isLoading = true
+
+            // Clear state
+            this.teams = {}
+            this.selectedPlayerIds = []
+            this.nextMatchDate = null
+            this.currentMatchId = null
+            this.isCompleted = false
+            this.canRate = false
+
+            try {
+                const match = await fetch<any>(`/matches/${matchId}`)
+                if (!match) return { success: false }
+
+                this.currentMatchId = match.id || match.Id
+                this.isCompleted = match.isCompleted || match.IsCompleted
+                // Sync match date logic if needed, but we usually drive this by date selection
+
+                if (match.FormatType || match.formatType) {
+                    this.formatType = match.FormatType || match.formatType
+
+                    // Try to parse format to populate maxPlayers and teamsCount
+                    // e.g. "5v5" -> 2 teams, 10 players
+                    if (this.formatType.includes('v')) {
+                        const parts = this.formatType.split('v')
+                        this.teamsCount = parts.length
+                        // Assume all teams equal size for maxPlayers calculation
+                        // or sum them up
+                        this.maxPlayers = parts.reduce((sum: number, p: string) => sum + parseInt(p), 0)
+                    }
+                }
+
+                const newTeams: Record<number, Player[]> = {}
+                const newSelectedIds: string[] = []
+                let maxTeam = 0
+
+                // Parse assignments
+                if (match.matchAssignments || match.MatchAssignments) {
+                    const assignments = match.matchAssignments || match.MatchAssignments
+                    assignments.forEach((ma: any) => {
+                        const player = ma.player || ma.Player
+                        const pid = player.id || player.Id
+                        newSelectedIds.push(pid)
+                        const teamNum = ma.teamNumber || ma.TeamNumber
+                        if (teamNum > 0) {
+                            if (!newTeams[teamNum]) newTeams[teamNum] = []
+                            // Map player data correctly
+                            newTeams[teamNum].push({
+                                id: pid,
+                                fullName: player.fullName || player.FullName,
+                                currentRating: player.currentRating || player.CurrentRating,
+                                avgMatchRating: player.avgMatchRating || player.AvgMatchRating,
+                                preferredPosition: player.preferredPosition || player.PreferredPosition,
+                                lastPlayed: player.lastPlayed || player.LastPlayed
+                            })
+                            if (teamNum > maxTeam) maxTeam = teamNum
+                        }
+                    })
+                }
+
+                this.teams = newTeams
+                this.selectedPlayerIds = newSelectedIds
+                this.teamsCount = maxTeam > 0 ? maxTeam : 2
+
+                // Check if user can rate this match
+                if (this.isCompleted) {
+                    await this.checkCanRate(matchId)
+                }
+
+                return { success: true, match }
+            } catch (error) {
+                console.error('Failed to fetch match', error)
+                return { success: false, error }
             } finally {
                 this.isLoading = false
             }
@@ -191,60 +349,64 @@ export const useMatchStore = defineStore('match', {
 
             try {
                 const match = await fetch<any>(`/matches/by-date/${date}`)
-                console.log('[MatchStore] Fetched match:', match)
                 if (!match) return { success: false }
+                this.currentMatchId = match.id
+                this.isCompleted = match.isCompleted
 
                 const returnedDate = (match.date || match.Date)?.split('T')[0]
 
-                if (returnedDate === date) {
-                    console.log('[MatchStore] Exact date match found:', returnedDate)
-                    this.currentMatchId = match.id || match.Id
-                    this.isCompleted = match.isCompleted || match.IsCompleted
+                if (match.FormatType || match.formatType) {
+                    this.formatType = match.FormatType || match.formatType
 
-                    const newTeams: Record<number, Player[]> = {}
-                    const newSelectedIds: string[] = []
-                    let maxTeam = 0
+                    // Try to parse format to populate maxPlayers and teamsCount
+                    if (this.formatType.includes('v')) {
+                        const parts = this.formatType.split('v')
+                        this.teamsCount = parts.length
+                        this.maxPlayers = parts.reduce((sum: number, p: string) => sum + parseInt(p), 0)
+                    }
+                }
 
-                    const assignments = match.matchAssignments || match.MatchAssignments || []
+                const newTeams: Record<number, Player[]> = {}
+                const newSelectedIds: string[] = []
+                let maxTeam = 0
 
-                    assignments.forEach((a: any) => {
-                        const playerId = a.playerId || a.PlayerId
-                        const teamNumber = a.teamNumber || a.TeamNumber
-                        const rawPlayer = a.player || a.Player
+                const assignments = match.matchAssignments || match.MatchAssignments || []
 
-                        if (playerId) newSelectedIds.push(playerId)
-                        if (teamNumber && rawPlayer) {
-                            const player: Player = {
-                                id: rawPlayer.id || rawPlayer.Id,
-                                fullName: rawPlayer.fullName || rawPlayer.FullName,
-                                currentRating: rawPlayer.currentRating || rawPlayer.CurrentRating,
-                                preferredPosition: rawPlayer.preferredPosition || rawPlayer.PreferredPosition
-                            }
-                            if (!newTeams[teamNumber]) newTeams[teamNumber] = []
-                            newTeams[teamNumber].push(player)
-                            if (teamNumber > maxTeam) maxTeam = teamNumber
+                assignments.forEach((a: any) => {
+                    const playerId = a.playerId || a.PlayerId
+                    const teamNumber = a.teamNumber || a.TeamNumber
+                    const rawPlayer = a.player || a.Player
+
+                    if (playerId) newSelectedIds.push(playerId)
+                    if (teamNumber && rawPlayer) {
+                        const player: Player = {
+                            id: rawPlayer.id || rawPlayer.Id,
+                            fullName: rawPlayer.fullName || rawPlayer.FullName,
+                            currentRating: rawPlayer.currentRating || rawPlayer.CurrentRating,
+                            preferredPosition: rawPlayer.preferredPosition || rawPlayer.PreferredPosition
                         }
-                    })
-
-                    // Fallback to current teamsCount if no assignments
-                    if (maxTeam === 0) maxTeam = this.teamsCount || 2
-
-                    for (let i = 1; i <= maxTeam; i++) {
-                        if (!newTeams[i]) newTeams[i] = []
+                        if (!newTeams[teamNumber]) newTeams[teamNumber] = []
+                        newTeams[teamNumber].push(player)
+                        if (teamNumber > maxTeam) maxTeam = teamNumber
                     }
+                })
 
-                    this.selectedPlayerIds = newSelectedIds
-                    this.teams = newTeams
-                    this.teamsCount = maxTeam
-                    this.formatType = match.formatType || match.FormatType || '5v5'
-                    console.log('[MatchStore] State updated. Teams:', Object.keys(this.teams).length, 'Players:', this.selectedPlayerIds.length)
+                // Fallback to current teamsCount if no assignments
+                if (maxTeam === 0) maxTeam = this.teamsCount || 2
 
-                    // Check if user can rate this match
-                    if (this.isCompleted && this.currentMatchId) {
-                        await this.checkCanRate(this.currentMatchId)
-                    }
+                for (let i = 1; i <= maxTeam; i++) {
+                    if (!newTeams[i]) newTeams[i] = []
+                }
+
+                this.selectedPlayerIds = newSelectedIds
+                this.teams = newTeams
+                this.teamsCount = maxTeam
+                this.formatType = match.formatType || match.FormatType || '5v5'
+
+                // Check if user can rate this match
+                if (this.isCompleted && this.currentMatchId) {
+                    await this.checkCanRate(this.currentMatchId)
                 } else {
-                    console.log('[MatchStore] Future match found:', returnedDate)
                     this.nextMatchDate = returnedDate
                 }
 
@@ -335,7 +497,7 @@ export const useMatchStore = defineStore('match', {
             const { fetch } = useApi()
             this.isLoading = true
             try {
-                await fetch(`/matches/${matchId}/ratings`, {
+                await fetch(`/matches/${matchId}/submit-ratings`, {
                     method: 'POST',
                     body: ratings
                 })

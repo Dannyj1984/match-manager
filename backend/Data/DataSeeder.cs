@@ -39,17 +39,9 @@ public static class DataSeeder
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUser, "Admin");
-
-                // Create associated Player for the admin
-                var adminPlayer = new Player
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = "System Admin",
-                    IdentityUserId = adminUser.Id
-                };
-                context.Players.Add(adminPlayer);
                 
-                adminUser.PlayerId = adminPlayer.Id;
+                // Set as super admin
+                adminUser.IsSuperAdmin = true;
                 await context.SaveChangesAsync();
             }
         }
