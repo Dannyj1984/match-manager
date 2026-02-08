@@ -9,15 +9,17 @@ const props = defineProps<{
 const emit = defineEmits(['close'])
 
 const store = useMatchStore()
+const { addMember } = useLeague()
 const isLoading = ref(false)
 const error = ref('')
+const mode = ref<'new' | 'existing'>('new')
 
 const form = reactive({
     email: '',
     fullName: '',
     initialPassword: '',
     initialRating: 5.0,
-    preferredPosition: 'M'
+    preferredPosition: ['M']
 })
 
 const resetForm = () => {
@@ -25,13 +27,28 @@ const resetForm = () => {
     form.fullName = ''
     form.initialPassword = ''
     form.initialRating = 5.0,
-        form.preferredPosition = 'M'
+        form.preferredPosition = ['M']
     error.value = ''
+    mode.value = 'new'
 }
 
 
 const { currentLeague } = useLeague()
 const leaguePositions = currentLeague.value?.sport === "Netball" ? ['GK', 'GD', 'WD', 'C', 'WA', 'GA', 'GS'] : ['GK', 'D', 'M', 'A']
+
+const togglePosition = (pos: string) => {
+    const index = form.preferredPosition.indexOf(pos)
+    if (index > -1) {
+        // Remove if already selected (but keep at least one)
+        if (form.preferredPosition.length > 1) {
+            form.preferredPosition.splice(index, 1)
+        }
+    } else {
+        // Add if not selected
+        form.preferredPosition.push(pos)
+    }
+}
+
 const handleSubmit = async () => {
     isLoading.value = true
     error.value = ''
@@ -42,10 +59,25 @@ const handleSubmit = async () => {
         return
     }
 
-    const result = await store.createPlayer({
-        ...form,
-        leagueId: currentLeague.value.id
-    })
+    let result
+
+    if (mode.value === 'new') {
+        // Create new user account + player
+        result = await store.createPlayer({
+            ...form,
+            leagueId: currentLeague.value.id
+        })
+    } else {
+        // Add existing user to league
+        try {
+            await addMember(currentLeague.value.id, form.email)
+            result = { success: true }
+            // Refresh players list
+            await store.fetchPlayers()
+        } catch (err: any) {
+            result = { success: false, error: err.message || 'Failed to add existing player' }
+        }
+    }
 
     if (result.success) {
         resetForm()
@@ -72,13 +104,34 @@ const handleSubmit = async () => {
                         <UserPlus :size="20" />
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-white">Add New Player</h2>
-                        <p class="text-sm text-slate-400">Create a user account and player profile.</p>
+                        <h2 class="text-xl font-bold text-white">Add Player</h2>
+                        <p class="text-sm text-slate-400">{{ mode === 'new' ? 'Create new account' : 'Add existing user'
+                            }}</p>
                     </div>
                 </div>
                 <button @click="emit('close')"
                     class="p-2 hover:bg-white/5 rounded-lg transition-colors text-slate-500 hover:text-white">
                     <X :size="20" />
+                </button>
+            </div>
+
+            <!-- Mode Toggle -->
+            <div class="flex gap-2 p-1 bg-slate-900/50 rounded-xl border border-white/5">
+                <button type="button" @click="mode = 'new'" :class="[
+                    'flex-1 py-2.5 px-4 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
+                    mode === 'new'
+                        ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                        : 'text-slate-500 hover:text-slate-300'
+                ]">
+                    Create New
+                </button>
+                <button type="button" @click="mode = 'existing'" :class="[
+                    'flex-1 py-2.5 px-4 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
+                    mode === 'existing'
+                        ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                        : 'text-slate-500 hover:text-slate-300'
+                ]">
+                    Add Existing
                 </button>
             </div>
 
@@ -97,59 +150,65 @@ const handleSubmit = async () => {
                         </label>
                         <input v-model="form.email" type="email" required placeholder="player@example.com"
                             class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
+                        <p v-if="mode === 'existing'" class="text-[10px] text-slate-500 italic">
+                            Enter the email of an existing user account
+                        </p>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <UserPlus :size="12" /> Full Name
-                        </label>
-                        <input v-model="form.fullName" type="text" required placeholder="John Doe"
-                            class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <Lock :size="12" /> Initial Password
-                        </label>
-                        <input v-model="form.initialPassword" type="password" required placeholder="••••••••"
-                            class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <Star :size="12" /> Preferred Position
-                        </label>
-                        <div class="grid grid-cols-4 gap-2">
-                            <button v-for="pos in leaguePositions" :key="pos" type="button"
-                                @click="form.preferredPosition = pos" :class="[
-                                    'py-2.5 rounded-xl border text-xs font-black transition-all',
-                                    form.preferredPosition === pos
-                                        ? 'bg-primary/20 border-primary text-primary shadow-lg shadow-primary/10'
-                                        : 'bg-white/5 border-white/5 text-slate-500 hover:border-white/10 hover:text-slate-300'
-                                ]">
-                                {{ pos }}
-                            </button>
+                    <!-- Only show these fields for new player mode -->
+                    <template v-if="mode === 'new'">
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                <UserPlus :size="12" /> Full Name
+                            </label>
+                            <input v-model="form.fullName" type="text" required placeholder="John Doe"
+                                class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
                         </div>
-                    </div>
 
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <Star :size="12" /> Initial Rating (1-10)
-                        </label>
-                        <input v-model="form.initialRating" type="number" step="0.1" min="1" max="10" required
-                            class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
-                    </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                <Lock :size="12" /> Initial Password
+                            </label>
+                            <input v-model="form.initialPassword" type="password" required placeholder="••••••••"
+                                class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                <Star :size="12" /> Preferred Position
+                            </label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button v-for="pos in leaguePositions" :key="pos" type="button"
+                                    @click="togglePosition(pos)" :class="[
+                                        'py-2.5 rounded-xl border text-xs font-black transition-all',
+                                        form.preferredPosition.includes(pos)
+                                            ? 'bg-primary/20 border-primary text-primary shadow-lg shadow-primary/10'
+                                            : 'bg-white/5 border-white/5 text-slate-500 hover:border-white/10 hover:text-slate-300'
+                                    ]">
+                                    {{ pos }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                <Star :size="12" /> Initial Rating (1-10)
+                            </label>
+                            <input v-model="form.initialRating" type="number" step="0.1" min="1" max="10" required
+                                class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
+                        </div>
+                    </template>
                 </div>
 
                 <div class="pt-4">
                     <button type="submit" :disabled="isLoading"
                         class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed">
                         <Loader2 v-if="isLoading" :size="20" class="animate-spin" />
-                        <span v-else>CREATE PLAYER PROFILE</span>
+                        <span v-else>{{ mode === 'new' ? 'CREATE PLAYER PROFILE' : 'ADD EXISTING PLAYER' }}</span>
                     </button>
                 </div>
             </form>

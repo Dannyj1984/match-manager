@@ -152,11 +152,10 @@ watch(currentLeague, async (newLeague) => {
           <div
             class="bg-primary/5 border border-primary/20 rounded-3xl p-8 relative overflow-hidden group hover:bg-primary/10 transition-colors">
             <h3 class="text-lg font-black text-white mb-2 italic uppercase">COMMUNITY STANDINGS</h3>
-            <p class="text-slate-400 text-sm font-medium mb-6 leading-relaxed">Check where you rank against the rest of
-              the league in the global leaderboard.</p>
+            <p class="text-slate-400 text-sm font-medium mb-6 leading-relaxed">See all players.</p>
             <NuxtLink to="/players"
               class="inline-flex items-center gap-2 text-primary font-black text-xs uppercase tracking-widest hover:translate-x-1 transition-transform">
-              Full Leaderboard
+              All Players
               <ChevronRight :size="14" />
             </NuxtLink>
           </div>

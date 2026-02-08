@@ -91,7 +91,7 @@ const clearSearch = () => {
                                 <p class="text-sm font-bold text-white leading-none">{{ player.fullName }}</p>
                                 <span
                                     class="text-[8px] font-black bg-white/5 text-slate-500 border border-white/5 py-0 px-1 rounded uppercase tracking-tighter">{{
-                                        player.preferredPosition }}</span>
+                                        player.preferredPosition.join(', ') }}</span>
                             </div>
                             <p class="text-[10px] text-slate-500 mt-1 font-mono uppercase tracking-wider">Rating: {{
                                 player.currentRating }}</p>

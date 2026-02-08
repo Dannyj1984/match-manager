@@ -125,7 +125,33 @@ public class AuthController : ControllerBase
             user = new { user.Email, roles, playerId = player?.Id, isSuperAdmin = user.IsSuperAdmin }
         });
     }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = User.FindFirstValue("userId");
+        var user = await _userManager.FindByIdAsync(userId!);
+        if (user == null) return NotFound(new { Message = "User not found" });
+
+        // Verify current password
+        if (!await _userManager.CheckPasswordAsync(user, request.CurrentPassword))
+        {
+            return BadRequest(new { Message = "Current password is incorrect" });
+        }
+
+        // Change password
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { Message = "Failed to change password", Errors = result.Errors });
+        }
+
+        return Ok(new { Message = "Password changed successfully" });
+    }
 }
 
 public record RegisterRequest(string Email, string Password, string FullName, bool IsAdmin = false);
 public record LoginRequest(string Email, string Password);
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
