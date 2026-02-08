@@ -19,8 +19,7 @@ public class Player
     public decimal? AvgMatchRating { get; set; } // Average of match ratings from last 6 months
     
     [Required]
-    [MaxLength(10)]
-    public string PreferredPosition { get; set; } = "M"; // GK, D, M, A
+    public List<string> PreferredPosition { get; set; } = new() { "M" }; // GK, D, M, A - can select multiple
     
     public DateTime? LastPlayed { get; set; }
 

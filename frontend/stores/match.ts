@@ -5,7 +5,7 @@ export interface Player {
     fullName: string
     currentRating: number
     avgMatchRating?: number // Average rating from last 6 months of matches
-    preferredPosition: string
+    preferredPosition: string[]
     lastPlayed?: string
     role?: string // LeagueMembership role: 'Admin', 'Member', 'SuperAdmin'
     identityUserId?: string // User ID to check for self-demotion
@@ -66,7 +66,7 @@ export const useMatchStore = defineStore('match', {
             }
         },
 
-        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number, preferredPosition: string, leagueId?: string }) {
+        async createPlayer(playerData: { email: string, fullName: string, initialPassword: string, initialRating: number, preferredPosition: string[], leagueId?: string }) {
             const { fetch } = useApi()
             try {
                 const headers: Record<string, string> = {}
@@ -448,7 +448,7 @@ export const useMatchStore = defineStore('match', {
             }
         },
 
-        async updateProfile(profileData: { fullName: string, preferredPosition: string }) {
+        async updateProfile(profileData: { fullName: string, preferredPosition: string[] }) {
             const { fetch } = useApi()
             this.isLoading = true
             try {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Play, Users, Trophy, ChevronRight, Activity, Calendar, Star, TrendingUp } from 'lucide-vue-next'
+import { Trophy, ChevronRight, Activity, Calendar, Star, TrendingUp } from 'lucide-vue-next'
 
 definePageMeta({
   middleware: ['league']
@@ -96,7 +96,7 @@ watch(currentLeague, async (newLeague) => {
                 <div class="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary mb-6">
                   <Activity :size="24" />
                 </div>
-                <h3 class="text-2xl font-black text-white mb-2 uppercase tracking-tight">Active Match</h3>
+                <h3 class="text-2xl font-black text-white mb-2 uppercase tracking-tight">Next Match</h3>
                 <p class="text-slate-400 text-sm font-medium mb-8">Check the teams and schedule for <span
                     class="text-white">{{ formatDate(dashboardData.nextActiveMatchDate) }}</span></p>
                 <div class="mt-auto flex items-center text-primary font-black text-xs uppercase tracking-widest gap-2">
@@ -152,11 +152,10 @@ watch(currentLeague, async (newLeague) => {
           <div
             class="bg-primary/5 border border-primary/20 rounded-3xl p-8 relative overflow-hidden group hover:bg-primary/10 transition-colors">
             <h3 class="text-lg font-black text-white mb-2 italic uppercase">COMMUNITY STANDINGS</h3>
-            <p class="text-slate-400 text-sm font-medium mb-6 leading-relaxed">Check where you rank against the rest of
-              the league in the global leaderboard.</p>
+            <p class="text-slate-400 text-sm font-medium mb-6 leading-relaxed">See all players.</p>
             <NuxtLink to="/players"
               class="inline-flex items-center gap-2 text-primary font-black text-xs uppercase tracking-widest hover:translate-x-1 transition-transform">
-              Full Leaderboard
+              All Players
               <ChevronRight :size="14" />
             </NuxtLink>
           </div>

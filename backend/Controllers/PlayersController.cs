@@ -223,6 +223,6 @@ public class PlayersController : ControllerBase
     }
 }
 
-public record CreatePlayerRequest(string Email, string FullName, string InitialPassword, string PreferredPosition, decimal InitialRating = 5.0m);
-public record UpdateProfileRequest(string FullName, string PreferredPosition);
+public record CreatePlayerRequest(string Email, string FullName, string InitialPassword, List<string> PreferredPosition, decimal InitialRating = 5.0m);
+public record UpdateProfileRequest(string FullName, List<string> PreferredPosition);
 public record UpdateRatingRequest(decimal NewRating);

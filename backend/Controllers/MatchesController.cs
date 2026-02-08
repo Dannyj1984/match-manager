@@ -319,74 +319,117 @@ public class MatchesController : ControllerBase
             .FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (player == null) return NotFound("Player not found");
 
-        // Standardize date to UTC midnight to avoid timezone mismatches
+        // Standardize date to UTC midnight
         var matchDate = request.Date.ToUniversalTime().Date;
 
-        Match? match = null;
-
-        // Try to find by ID first if provided
-        if (request.MatchId.HasValue)
+        // Use a serializable transaction to prevent race conditions when joining a full match
+        using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        try
         {
-            match = await _context.Matches
-                .Include(m => m.MatchAssignments)
-                .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Id == request.MatchId.Value);
-        }
+            Match? match = null;
 
-        // Fallback to date lookup if ID not provided or not found
-        if (match == null)
-        {
-            match = await _context.Matches
-                .Include(m => m.MatchAssignments)
-                .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == matchDate);
-        }
-
-        if (match == null)
-        {
-            // Create new match if doesn't exist
-            match = new Match
+            // Try to find by ID first if provided
+            if (request.MatchId.HasValue)
             {
-                Id = Guid.NewGuid(),
-                LeagueId = leagueId,
-                Date = matchDate,
-                FormatType = request.FormatType ?? "5v5",
-                IsCompleted = false
-            };
-            _context.Matches.Add(match);
-        }
+                match = await _context.Matches
+                    .Include(m => m.MatchAssignments)
+                    .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Id == request.MatchId.Value);
+            }
 
-        // Toggle participation
-        var existingAssignment = match.MatchAssignments
-            .FirstOrDefault(ma => ma.PlayerId == player.Id);
-
-        if (request.IsParticipating)
-        {
-            // Add player if not already in
-            if (existingAssignment == null)
+            // Fallback to date lookup if ID not provided or not found
+            if (match == null)
             {
-                match.MatchAssignments.Add(new MatchAssignment
+                match = await _context.Matches
+                    .Include(m => m.MatchAssignments)
+                    .FirstOrDefaultAsync(m => m.LeagueId == leagueId && m.Date.Date == matchDate);
+            }
+
+            if (match == null)
+            {
+                // Create new match if doesn't exist
+                match = new Match
                 {
-                    MatchId = match.Id,
-                    PlayerId = player.Id,
-                    TeamNumber = 0 // Not assigned to team yet
-                });
+                    Id = Guid.NewGuid(),
+                    LeagueId = leagueId,
+                    Date = matchDate,
+                    FormatType = request.FormatType ?? "5v5",
+                    IsCompleted = false
+                };
+                _context.Matches.Add(match);
+                // Save immediately to establish the match ID and default state
+                await _context.SaveChangesAsync();
             }
-        }
-        else
-        {
-            // Remove player
-            if (existingAssignment != null)
+
+            // Toggle participation
+            var existingAssignment = match.MatchAssignments
+                .FirstOrDefault(ma => ma.PlayerId == player.Id);
+
+            if (request.IsParticipating)
             {
-                match.MatchAssignments.Remove(existingAssignment);
+                // Add player if not already in
+                if (existingAssignment == null)
+                {
+                    // CAPACITY CHECK
+                    int maxPlayers = GetMaxPlayers(match.FormatType);
+                    if (match.MatchAssignments.Count >= maxPlayers)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new { Message = $"Match is full (Max {maxPlayers} players)" });
+                    }
+
+                    match.MatchAssignments.Add(new MatchAssignment
+                    {
+                        MatchId = match.Id,
+                        PlayerId = player.Id,
+                        TeamNumber = 0 // Not assigned to team yet
+                    });
+                }
             }
+            else
+            {
+                // Remove player
+                if (existingAssignment != null)
+                {
+                    match.MatchAssignments.Remove(existingAssignment);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { 
+                success = true, 
+                isParticipating = request.IsParticipating,
+                message = request.IsParticipating ? "You're in!" : "You're out" 
+            });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    private int GetMaxPlayers(string formatType)
+    {
+        if (string.IsNullOrWhiteSpace(formatType)) return 16; // Default to 8v8 size
+
+        // Try to parse "5v5", "7v7", "5-a-side", etc.
+        // Simple logic: extract first number and double it
+        var numberPart = new string(formatType.TakeWhile(char.IsDigit).ToArray());
+        if (int.TryParse(numberPart, out int teamSize))
+        {
+            return teamSize * 2;
         }
 
-        await _context.SaveChangesAsync();
+        // Handle "XvX" format if it starts with non-digit (unlikely but safe)
+        var parts = formatType.Split(new[] { 'v', 'V' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2 && int.TryParse(parts[0], out int size))
+        {
+            return size * 2;
+        }
 
-        return Ok(new { 
-            success = true, 
-            isParticipating = request.IsParticipating,
-            message = request.IsParticipating ? "You're in!" : "You're out" 
-        });
+        return 16;
     }
 }
 

@@ -12,9 +12,23 @@ export const useLeague = () => {
             })
             userLeagues.value = response as any[]
 
+            // Try to restore previously selected league from localStorage
+            const savedLeagueId = process.client ? localStorage.getItem('selectedLeagueId') : null
+
+            if (savedLeagueId) {
+                const savedLeague = userLeagues.value.find(l => l.id === savedLeagueId)
+                if (savedLeague) {
+                    currentLeague.value = savedLeague
+                    return
+                }
+            }
+
             // Set first league as current if none selected
             if (!currentLeague.value && userLeagues.value.length > 0) {
                 currentLeague.value = userLeagues.value[0]
+                if (process.client) {
+                    localStorage.setItem('selectedLeagueId', currentLeague.value.id)
+                }
             }
         } catch (error) {
             console.error('Failed to fetch leagues:', error)
@@ -23,11 +37,18 @@ export const useLeague = () => {
 
     const setCurrentLeague = (league: any) => {
         currentLeague.value = league
+        // Persist selection to localStorage
+        if (process.client && league) {
+            localStorage.setItem('selectedLeagueId', league.id)
+        }
     }
 
     const clearLeague = () => {
         currentLeague.value = null
         userLeagues.value = []
+        if (process.client) {
+            localStorage.removeItem('selectedLeagueId')
+        }
     }
 
     const createLeague = async (leagueData: {

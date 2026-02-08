@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { User, Mail, Star, Save, Loader2, CheckCircle } from 'lucide-vue-next'
+import { User, Mail, Star, Save, Loader2, CheckCircle, Lock, ChevronDown } from 'lucide-vue-next'
 
 const { currentLeague } = useLeague()
 const { getPositionsForSport } = useSportPositions()
@@ -14,9 +14,20 @@ const errorMessage = ref('')
 const form = reactive({
     email: '',
     fullName: '',
-    preferredPosition: 'M',
+    preferredPosition: ['M'],
     currentRating: 0
 })
+
+const passwordForm = reactive({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+})
+
+const isChangingPassword = ref(false)
+const passwordSuccessMessage = ref('')
+const passwordErrorMessage = ref('')
+const isPasswordSectionOpen = ref(false)
 
 // Get positions for current league's sport
 const availablePositions = computed(() => {
@@ -42,7 +53,7 @@ const handleSave = async () => {
 
     const result = await store.updateProfile({
         fullName: form.fullName,
-        preferredPosition: form.preferredPosition
+        preferredPosition: form.preferredPosition.filter((p) => p !== 'Any')
     })
 
     if (result.success) {
@@ -52,6 +63,71 @@ const handleSave = async () => {
         errorMessage.value = result.error
     }
     isSaving.value = false
+}
+
+const togglePosition = (pos: string) => {
+    const index = form.preferredPosition.indexOf(pos)
+    if (index > -1) {
+        // Remove if already selected (but keep at least one)
+        if (form.preferredPosition.length > 1) {
+            form.preferredPosition.splice(index, 1)
+        }
+    } else {
+        form.preferredPosition.push(pos)
+    }
+
+}
+
+const handlePasswordChange = async () => {
+    isChangingPassword.value = true
+    passwordSuccessMessage.value = ''
+    passwordErrorMessage.value = ''
+
+    // Validate passwords match
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        passwordErrorMessage.value = 'New passwords do not match'
+        isChangingPassword.value = false
+        return
+    }
+
+    // Validate password length
+    if (passwordForm.newPassword.length < 6) {
+        passwordErrorMessage.value = 'Password must be at least 6 characters'
+        isChangingPassword.value = false
+        return
+    }
+
+    try {
+        const { token } = useAuth()
+        if (!token.value) {
+            passwordErrorMessage.value = 'Not authenticated'
+            isChangingPassword.value = false
+            return
+        }
+
+        await $fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: {
+                'Authorization': token.value,
+                'Content-Type': 'application/json'
+            },
+            body: {
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            }
+        })
+
+        passwordSuccessMessage.value = 'Password changed successfully!'
+        // Reset form
+        passwordForm.currentPassword = ''
+        passwordForm.newPassword = ''
+        passwordForm.confirmPassword = ''
+        setTimeout(() => passwordSuccessMessage.value = '', 3000)
+    } catch (error: any) {
+        passwordErrorMessage.value = error.data?.message || 'Failed to change password'
+    }
+
+    isChangingPassword.value = false
 }
 
 definePageMeta({
@@ -105,7 +181,7 @@ definePageMeta({
                             </div>
                             <div class="bg-slate-900/50 p-4 rounded-2xl border border-white/5">
                                 <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pos</p>
-                                <p class="text-xl font-black text-primary">{{ form.preferredPosition }}</p>
+                                <p class="text-xl font-black text-primary">{{ form.preferredPosition.join(', ') }}</p>
                             </div>
                         </div>
                     </div>
@@ -152,6 +228,79 @@ definePageMeta({
                                         class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all" />
                                 </div>
 
+                                <!-- Password Change Section -->
+                                <div class="pt-4 border-t border-white/5">
+                                    <!-- Accordion Header -->
+                                    <button type="button" @click="isPasswordSectionOpen = !isPasswordSectionOpen"
+                                        class="w-full flex items-center justify-between py-3 px-4 rounded-xl hover:bg-white/5 transition-colors group">
+                                        <label
+                                            class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 cursor-pointer">
+                                            <Lock :size="12" /> Change Password
+                                        </label>
+                                        <ChevronDown :size="16" :class="[
+                                            'text-slate-500 transition-transform duration-200',
+                                            isPasswordSectionOpen ? 'rotate-180' : ''
+                                        ]" />
+                                    </button>
+
+                                    <!-- Accordion Content -->
+                                    <div v-show="isPasswordSectionOpen"
+                                        class="space-y-4 pt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div v-if="passwordSuccessMessage"
+                                            class="bg-success/10 border border-success/20 text-success text-sm p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                            <CheckCircle :size="18" />
+                                            {{ passwordSuccessMessage }}
+                                        </div>
+
+                                        <div v-if="passwordErrorMessage"
+                                            class="bg-danger/10 border border-danger/20 text-danger text-sm p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                            <div class="w-1.5 h-1.5 rounded-full bg-danger animate-pulse"></div>
+                                            {{ passwordErrorMessage }}
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <div class="space-y-2">
+                                                <label
+                                                    class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                    Current Password
+                                                </label>
+                                                <input v-model="passwordForm.currentPassword" type="password"
+                                                    placeholder="Enter current password"
+                                                    class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all" />
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                <label
+                                                    class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                    New Password
+                                                </label>
+                                                <input v-model="passwordForm.newPassword" type="password"
+                                                    placeholder="Enter new password"
+                                                    class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all" />
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                <label
+                                                    class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                    Confirm New Password
+                                                </label>
+                                                <input v-model="passwordForm.confirmPassword" type="password"
+                                                    placeholder="Confirm new password"
+                                                    class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all" />
+                                            </div>
+
+                                            <button type="button" @click="handlePasswordChange"
+                                                :disabled="isChangingPassword"
+                                                class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <Loader2 v-if="isChangingPassword" :size="18" class="animate-spin" />
+                                                <Lock v-else :size="18" />
+                                                <span>{{ isChangingPassword ? 'Updating...' : 'Update Password'
+                                                }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Position Selector -->
                                 <div class="space-y-3">
                                     <label
@@ -160,14 +309,14 @@ definePageMeta({
                                     </label>
                                     <div class="grid grid-cols-4 gap-4">
                                         <button v-for="pos in availablePositions" :key="pos" type="button"
-                                            @click="form.preferredPosition = pos" :class="[
+                                            @click="togglePosition(pos)" :class="[
                                                 'py-4 rounded-2xl border text-sm font-black transition-all group relative overflow-hidden',
-                                                form.preferredPosition === pos
+                                                form.preferredPosition.includes(pos)
                                                     ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20'
                                                     : 'bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/20 hover:text-white'
                                             ]">
                                             {{ pos }}
-                                            <div v-if="form.preferredPosition === pos"
+                                            <div v-if="form.preferredPosition.includes(pos)"
                                                 class="absolute inset-0 bg-white/10 animate-pulse"></div>
                                         </button>
                                     </div>

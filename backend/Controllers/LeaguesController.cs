@@ -242,7 +242,7 @@ public class LeaguesController : ControllerBase
                 IdentityUserId = user.Id,
                 LeagueId = id,
                 CurrentRating = 5,
-                PreferredPosition = "Any"
+                PreferredPosition = new List<string> { "Any" }
             };
             
             _context.Players.Add(player);
@@ -367,7 +367,7 @@ public class LeaguesController : ControllerBase
             IdentityUserId = newUser.Id,
             LeagueId = id,
             CurrentRating = 5,
-            PreferredPosition = request.PreferredPosition ?? "Any"
+            PreferredPosition = request.PreferredPosition ?? new List<string> { "Any" }
         };
         
         _context.Players.Add(player);
@@ -402,4 +402,4 @@ public record LeagueDto(Guid Id, string Name, string Sport, int MaxTeams, string
 public record CreateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, string? InitialAdminUserId);
 public record UpdateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost);
 public record AddMemberRequest(string Email);
-public record CreateLeagueAdminRequest(string Email, string FullName, string Password, string? PreferredPosition);
+public record CreateLeagueAdminRequest(string Email, string FullName, string Password, List<string>? PreferredPosition);
