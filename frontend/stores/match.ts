@@ -9,6 +9,12 @@ export interface Player {
     lastPlayed?: string
     role?: string // LeagueMembership role: 'Admin', 'Member', 'SuperAdmin'
     identityUserId?: string // User ID to check for self-demotion
+    stats?: {
+        gamesPlayed: number
+        streak: number
+        rating4Weeks: number | null
+        earlyBird: number
+    }
 }
 
 export interface MatchAssignment {
@@ -34,7 +40,8 @@ export const useMatchStore = defineStore('match', {
         nextMatchDate: null as string | null,
         currentMatchId: null as string | null,
         isCompleted: false,
-        canRate: false
+        canRate: false,
+        allowRatings: null as boolean | null
     }),
 
     getters: {
@@ -225,7 +232,8 @@ export const useMatchStore = defineStore('match', {
                     body: {
                         date: this.matchDate,
                         formatType: this.formatType,
-                        assignments: assignments
+                        assignments: assignments,
+                        allowRatings: this.allowRatings
                     }
                 })
                 if (match && (match.id || match.Id)) {
@@ -273,6 +281,8 @@ export const useMatchStore = defineStore('match', {
 
                 this.currentMatchId = match.id || match.Id
                 this.isCompleted = match.isCompleted || match.IsCompleted
+                if (match.allowRatings !== undefined) this.allowRatings = match.allowRatings
+                else if (match.AllowRatings !== undefined) this.allowRatings = match.AllowRatings
                 // Sync match date logic if needed, but we usually drive this by date selection
 
                 if (match.FormatType || match.formatType) {
@@ -352,6 +362,8 @@ export const useMatchStore = defineStore('match', {
                 if (!match) return { success: false }
                 this.currentMatchId = match.id
                 this.isCompleted = match.isCompleted
+                if (match.allowRatings !== undefined) this.allowRatings = match.allowRatings
+                else if (match.AllowRatings !== undefined) this.allowRatings = match.AllowRatings
 
                 const returnedDate = (match.date || match.Date)?.split('T')[0]
 
@@ -415,6 +427,8 @@ export const useMatchStore = defineStore('match', {
                 if (error.status !== 404) {
                     console.error('Failed to fetch match', error)
                 }
+                // Reset to null if no match (will default to logic elsewhere or remain null)
+                this.allowRatings = null
                 return { success: false, error: 'No match found for this date' }
             } finally {
                 this.isLoading = false

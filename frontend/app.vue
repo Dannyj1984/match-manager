@@ -40,6 +40,10 @@ const handleLogout = async () => {
           class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
           {{ isSuperAdmin ? 'Leagues' : 'Dashboard' }}
         </NuxtLink>
+        <NuxtLink v-if="status === 'authenticated' && currentLeague" to="/leaderboard"
+          class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+          Leaderboard
+        </NuxtLink>
         <NuxtLink v-if="status === 'authenticated' && currentLeague && currentLeague.role !== 'SuperAdmin'"
           to="/match/setup" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">
           {{ currentLeague?.role === 'Admin' ? 'Match Setup' : 'Matches' }}

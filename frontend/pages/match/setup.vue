@@ -90,6 +90,21 @@ const handleToggleParticipation = async () => {
 definePageMeta({
   middleware: ['auth', 'league', 'member']
 })
+
+const effectiveAllowRatings = computed(() => {
+  if (store.allowRatings !== null) return store.allowRatings
+  return currentLeague.value?.allowRatings !== false // Default to true
+})
+
+const toggleRatings = () => {
+  // If currently null (default), set to opposite of default
+  if (store.allowRatings === null) {
+    store.allowRatings = !effectiveAllowRatings.value
+  } else {
+    // Otherwise just toggle
+    store.allowRatings = !store.allowRatings
+  }
+}
 </script>
 
 <template>
@@ -147,6 +162,24 @@ definePageMeta({
           <input type="number" v-model.number="store.maxPlayers" @input="store.updateFormatType()" min="4" max="50"
             step="1"
             class="bg-slate-900/50 border border-white/5 rounded-xl py-2 px-4 text-xs font-bold text-white focus:outline-none focus:border-primary/50 transition-all w-20" />
+        </div>
+
+        <div v-if="isAdmin && !store.isCompleted" class="space-y-1.5 flex flex-col">
+          <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Ratings</label>
+          <div class="flex items-center h-[34px]">
+            <button @click="toggleRatings" :class="[
+              'px-3 py-1.5 rounded-lg text-xs font-bold transition-all border',
+              effectiveAllowRatings
+                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
+                : 'bg-slate-800 text-slate-400 border-white/10 hover:bg-slate-700'
+            ]">
+              {{ effectiveAllowRatings ? 'ENABLED' : 'DISABLED' }}
+            </button>
+            <button v-if="store.allowRatings !== null" @click="store.allowRatings = null"
+              class="ml-1 text-[10px] text-slate-500 hover:text-white" title="Reset to League Default">
+              x
+            </button>
+          </div>
         </div>
 
         <div v-if="isAdmin" class="hidden md:flex flex-col items-center justify-center px-2">

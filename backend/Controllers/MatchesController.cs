@@ -57,8 +57,21 @@ public class MatchesController : ControllerBase
         match.IsCompleted = true;
         await _context.SaveChangesAsync();
 
-        // Note: Player avg match ratings are now updated when users submit match performance ratings
-        // via the MatchRatingService, not automatically when match is completed
+        // TODO: update player last played value to the date of this match. for all players in the match
+        var matchAssignments = await _context.MatchAssignments
+            .Where(ma => ma.MatchId == id)
+            .ToListAsync();
+
+        foreach (var assignment in matchAssignments)
+        {
+            var player = await _context.Players.FindAsync(assignment.PlayerId);
+            if (player != null && player.LastPlayed < match.Date)
+            {
+                player.LastPlayed = match.Date;
+            }
+        }
+
+        await _context.SaveChangesAsync();
 
         return Ok(new { Message = "Match marked as completed" });
     }
@@ -102,6 +115,7 @@ public class MatchesController : ControllerBase
             // Update existing match
             match.Location = request.Location ?? match.Location;
             match.FormatType = request.FormatType;
+            match.AllowRatings = request.AllowRatings;
             
             // Update assignments
             // Remove existing assignments
@@ -131,6 +145,7 @@ public class MatchesController : ControllerBase
                 Date = matchDate,
                 Location = request.Location ?? league?.Location,
                 FormatType = request.FormatType,
+                AllowRatings = request.AllowRatings,
                 IsCompleted = false
             };
 
@@ -226,13 +241,18 @@ public class MatchesController : ControllerBase
             .OrderByDescending(x => x.Date)
             .ToListAsync();
 
-        // 4. Find latest completed match that user hasn't rated yet
-        var matchesNeedingRatings = await _context.MatchAssignments
-            .Include(ma => ma.Match)
-            .Where(ma => ma.PlayerId == player.Id && ma.Match.IsCompleted)
-            .Select(ma => ma.Match)
-            .OrderByDescending(m => m.Date)
-            .ToListAsync();
+            // 4. Find latest completed match that user hasn't rated yet AND ratings are allowed
+            var league = await _context.Leagues.FindAsync(leagueId);
+            bool leagueAllowsRatings = league?.AllowRatings ?? true;
+
+            var matchesNeedingRatings = await _context.MatchAssignments
+                .Include(ma => ma.Match)
+                .Where(ma => ma.PlayerId == player.Id && ma.Match.IsCompleted)
+                // Filter where match allows ratings OR match setting is null and league allows ratings
+                .Where(ma => (ma.Match.AllowRatings ?? leagueAllowsRatings) == true)
+                .Select(ma => ma.Match)
+                .OrderByDescending(m => m.Date)
+                .ToListAsync();
 
         DateTime? pendingRatingMatchDate = null;
         foreach (var match in matchesNeedingRatings)
@@ -266,6 +286,13 @@ public class MatchesController : ControllerBase
         var match = await _context.Matches.Include(m => m.MatchAssignments).FirstOrDefaultAsync(m => m.Id == id && m.LeagueId == leagueId);
         if (match == null) return NotFound();
         if (!match.IsCompleted) return BadRequest("Cannot rate players for an incomplete match.");
+
+        // Check if ratings are allowed
+        var league = await _context.Leagues.FindAsync(leagueId);
+        if (!((match.AllowRatings ?? league?.AllowRatings) ?? true))
+        {
+             return BadRequest("Ratings are disabled for this match.");
+        }
 
         // Check if rater was a participant in this match
         var wasParticipant = match.MatchAssignments.Any(ma => ma.PlayerId == rater.Id);
@@ -310,7 +337,11 @@ public class MatchesController : ControllerBase
         if (match == null) return NotFound();
 
         var wasParticipant = match.MatchAssignments.Any(ma => ma.PlayerId == player.Id);
-        return Ok(new { canRate = wasParticipant && match.IsCompleted });
+        
+        var league = await _context.Leagues.FindAsync(leagueId);
+        bool areRatingsEnabled = (match.AllowRatings ?? league?.AllowRatings) ?? true;
+
+        return Ok(new { canRate = wasParticipant && match.IsCompleted && areRatingsEnabled });
     }
 
     [HttpPost("toggle-participation")]
@@ -439,7 +470,7 @@ public class MatchesController : ControllerBase
     }
 }
 
-public record CreateMatchRequest(DateTime Date, string FormatType, string? Location, List<AssignmentDto> Assignments);
+public record CreateMatchRequest(DateTime Date, string FormatType, string? Location, bool? AllowRatings, List<AssignmentDto> Assignments);
 public record AssignmentDto(Guid PlayerId, int TeamNumber);
 
 public record TeamCalculationRequest(List<Guid> PlayerIds, int TeamCount);

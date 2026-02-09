@@ -82,6 +82,7 @@ export const useLeague = () => {
         maxTeams: number
         location?: string
         description?: string
+        allowRatings?: boolean
     }) => {
         try {
             await $fetch(`/api/leagues/${leagueId}`, {

@@ -20,6 +20,8 @@ public class Match
     
     public bool IsCompleted { get; set; }
     
+    public bool? AllowRatings { get; set; }
+    
     // Navigation properties
     public League? League { get; set; }
     public List<MatchAssignment> MatchAssignments { get; set; } = new();

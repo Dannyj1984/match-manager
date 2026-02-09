@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check, Activity } from 'lucide-vue-next'
+import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check, Activity, Trophy, Medal, Flame, Clock } from 'lucide-vue-next'
 
 definePageMeta({
     middleware: ['auth', 'league', 'member']
@@ -31,6 +31,34 @@ const filteredPlayers = computed(() => {
     return store.availablePlayers.filter(p =>
         p.fullName.toLowerCase().includes(query)
     )
+})
+
+// Calculate Badge Winners
+const badges = computed(() => {
+    const players = store.availablePlayers
+
+    // Helper to find IDs with max value
+    const findMaxIds = (getValue: (p: any) => number) => {
+        let max = -1
+        let ids: string[] = []
+        players.forEach(p => {
+            const val = getValue(p)
+            if (val > max) {
+                max = val
+                ids = [p.id]
+            } else if (val === max && val > 0) {
+                ids.push(p.id)
+            }
+        })
+        return max > 0 ? ids : []
+    }
+
+    return {
+        goldenBoot: findMaxIds(p => p.stats?.rating4Weeks || 0),
+        ironMan: findMaxIds(p => p.stats?.gamesPlayed || 0),
+        streak: findMaxIds(p => p.stats?.streak || 0),
+        earlyBird: findMaxIds(p => p.stats?.earlyBird || 0)
+    }
 })
 
 watch(currentLeague, async (newLeague) => {
@@ -186,6 +214,56 @@ const formatDate = (dateString?: string) => {
                             class="text-slate-500 hover:text-primary transition-colors pb-1">
                             <Edit2 :size="16" />
                         </button>
+                    </div>
+                    <!-- Bagdes Row -->
+                    <div class="flex items-center gap-2 mt-2">
+                        <!-- Golden Boot Badge -->
+                        <div v-if="badges.goldenBoot.includes(player.id)" class="group relative">
+                            <div
+                                class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 flex items-center justify-center shadow-lg shadow-yellow-500/20 animate-pulse-slow">
+                                <Trophy :size="16" stroke-width="2.5" />
+                            </div>
+                            <div
+                                class="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Golden Boot ({{ player.stats?.rating4Weeks?.toFixed(1) || 0 }})
+                            </div>
+                        </div>
+
+                        <!-- Iron Man (Games Played) -->
+                        <div v-if="badges.ironMan.includes(player.id)" class="group relative">
+                            <div
+                                class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                <Medal :size="16" stroke-width="2.5" />
+                            </div>
+                            <div
+                                class="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Iron Man ({{ player.stats?.gamesPlayed || 0 }} Games)
+                            </div>
+                        </div>
+
+                        <!-- On Fire (Streak) -->
+                        <div v-if="badges.streak.includes(player.id)" class="group relative">
+                            <div
+                                class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 border border-orange-500/30 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                                <Flame :size="16" stroke-width="2.5" />
+                            </div>
+                            <div
+                                class="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                On Fire ({{ player.stats?.streak || 0 }} Streak)
+                            </div>
+                        </div>
+
+                        <!-- Early Bird -->
+                        <div v-if="badges.earlyBird.includes(player.id)" class="group relative">
+                            <div
+                                class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <Clock :size="16" stroke-width="2.5" />
+                            </div>
+                            <div
+                                class="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Early Bird ({{ player.stats?.earlyBird || 0 }}x First)
+                            </div>
+                        </div>
                     </div>
                 </div>
 

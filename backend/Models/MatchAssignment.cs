@@ -13,4 +13,6 @@ public class MatchAssignment
     public Player Player { get; set; } = null!;
     
     public int TeamNumber { get; set; }
+    
+    public DateTime Created { get; set; } = DateTime.UtcNow;
 }

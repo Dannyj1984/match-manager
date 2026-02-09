@@ -37,9 +37,14 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2">Default Location</label>
             <input v-model="leagueForm.location" type="text"
               class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none" />
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input v-model="leagueForm.allowRatings" type="checkbox" id="allowRatings"
+              class="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+            <label for="allowRatings" class="text-sm font-medium">Enable Player Ratings</label>
           </div>
 
           <div>
@@ -162,7 +167,8 @@ const leagueForm = ref({
   sport: 'Football',
   maxTeams: 2,
   location: '',
-  description: ''
+  description: '',
+  allowRatings: true
 })
 
 const adminForm = ref({
@@ -205,7 +211,8 @@ const loadLeagueData = async () => {
         sport: league.value.sport,
         maxTeams: league.value.maxTeams,
         location: league.value.location || '',
-        description: league.value.description || ''
+        description: league.value.description || '',
+        allowRatings: league.value.allowRatings !== false // Default to true if undefined
       }
     }
 
