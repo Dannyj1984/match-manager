@@ -87,10 +87,19 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Seed initial data
+// Migrations and Seeding
 using (var scope = app.Services.CreateScope())
 {
-    await DataSeeder.SeedAsync(scope.ServiceProvider);
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<FairPlayDbContext>();
+    
+    // Apply any pending migrations automatically
+    if (context.Database.GetPendingMigrations().Any())
+    {
+        context.Database.Migrate();
+    }
+
+    await DataSeeder.SeedAsync(services);
 }
 
 app.Run();
