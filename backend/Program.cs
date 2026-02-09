@@ -45,12 +45,17 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// CORS Configuration
+var allowedOrigins = builder.Configuration["AllowedOrigins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries) 
+                     ?? new[] { "http://localhost:3000", "https://evenplay.app", "https://www.evenplay.app" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
-        policy => policy.WithOrigins("http://localhost:3000")
+        policy => policy.WithOrigins(allowedOrigins)
                         .AllowAnyMethod()
-                        .AllowAnyHeader());
+                        .AllowAnyHeader()
+                        .AllowCredentials());
 });
 
 // Configure PostgreSQL

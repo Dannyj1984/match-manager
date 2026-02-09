@@ -28,7 +28,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     routeRules: {
-      '/api/**': { proxy: 'http://127.0.0.1:5137/api/**' }
+      '/api/**': { proxy: process.env.NUXT_API_PROXY_TARGET || 'http://127.0.0.1:5137/api/**' }
     }
   },
   runtimeConfig: {

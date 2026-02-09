@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: evenplay-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-fairplay_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fairplay_password}
+      POSTGRES_DB: ${DB_NAME:-fairplay_db}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - evenplay-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: evenplay-backend
+    restart: unless-stopped
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Database=${DB_NAME:-fairplay_db};Username=${DB_USER:-fairplay_user};Password=${DB_PASSWORD:-fairplay_password}
+      - Jwt__Key=${JWT_KEY:-super_secret_key_change_me_in_production}
+      - Jwt__Issuer=${JWT_ISSUER:-FairPlayApi}
+      - ASPNETCORE_URLS=http://+:5000
+    networks:
+      - evenplay-net
+      - nginx-proxy
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: evenplay
+    restart: unless-stopped
+    environment:
+      - NUXT_API_PROXY_TARGET=http://evenplay-backend:5000/api/**
+      - AUTH_ORIGIN=${AUTH_ORIGIN:-https://evenplay.app}
+      - NUXT_PUBLIC_API_BASE=/api
+      - PORT=80
+      - HOST=0.0.0.0
+    networks:
+      - evenplay-net
+      - nginx-proxy
+    depends_on:
+      - backend
+
+networks:
+  evenplay-net:
+    driver: bridge
+  nginx-proxy:
+    external: true
+    name: nginx-proxy_default
+
+volumes:
+  postgres_data_prod:

@@ -255,13 +255,15 @@ public class MatchesController : ControllerBase
     }
 
     [HttpPost("{id}/submit-ratings")]
+    [LeagueContext]
     public async Task<IActionResult> SubmitRatings(Guid id, [FromBody] List<RatingSubmissionDto> ratings)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
         var userId = User.FindFirstValue("userId");
-        var rater = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+        var rater = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (rater == null) return Unauthorized();
 
-        var match = await _context.Matches.Include(m => m.MatchAssignments).FirstOrDefaultAsync(m => m.Id == id);
+        var match = await _context.Matches.Include(m => m.MatchAssignments).FirstOrDefaultAsync(m => m.Id == id && m.LeagueId == leagueId);
         if (match == null) return NotFound();
         if (!match.IsCompleted) return BadRequest("Cannot rate players for an incomplete match.");
 
@@ -279,10 +281,12 @@ public class MatchesController : ControllerBase
     }
 
     [HttpGet("{id}/my-ratings")]
+    [LeagueContext]
     public async Task<IActionResult> GetMyRatings(Guid id)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
         var userId = User.FindFirstValue("userId");
-        var rater = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+        var rater = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (rater == null) return Unauthorized();
 
         var ratings = await _context.PlayerRatings
@@ -294,13 +298,15 @@ public class MatchesController : ControllerBase
     }
 
     [HttpGet("{id}/can-rate")]
+    [LeagueContext]
     public async Task<IActionResult> CanRateMatch(Guid id)
     {
+        var leagueId = (Guid)HttpContext.Items["LeagueId"]!;
         var userId = User.FindFirstValue("userId");
-        var player = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId);
+        var player = await _context.Players.FirstOrDefaultAsync(p => p.IdentityUserId == userId && p.LeagueId == leagueId);
         if (player == null) return Unauthorized();
 
-        var match = await _context.Matches.Include(m => m.MatchAssignments).FirstOrDefaultAsync(m => m.Id == id);
+        var match = await _context.Matches.Include(m => m.MatchAssignments).FirstOrDefaultAsync(m => m.Id == id && m.LeagueId == leagueId);
         if (match == null) return NotFound();
 
         var wasParticipant = match.MatchAssignments.Any(ma => ma.PlayerId == player.Id);
