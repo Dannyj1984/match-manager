@@ -23,6 +23,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.1.0"
+    "@types/node": "^25.1.0",
+    "@vite-pwa/nuxt": "^1.1.1"
   }
 }
