@@ -39,7 +39,7 @@ services:
     container_name: evenplay
     restart: unless-stopped
     environment:
-      - NUXT_API_PROXY_TARGET=http://evenplay-backend:5000/api/**
+      - NITRO_ROUTE_RULES={"/api/**":{"proxy":"http://evenplay-backend:5000/api/**"}}
       - AUTH_ORIGIN=${AUTH_ORIGIN:-https://evenplay.app}
       - NUXT_PUBLIC_API_BASE=/api
       - PORT=80
