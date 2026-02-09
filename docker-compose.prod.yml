@@ -25,6 +25,7 @@ services:
       - Jwt__Key=${JWT_KEY:-super_secret_key_change_me_in_production}
       - Jwt__Issuer=${JWT_ISSUER:-FairPlayApi}
       - ASPNETCORE_URLS=http://+:5000
+      - AllowedOrigins=${AllowedOrigins}
     networks:
       - evenplay-net
       - nginx-proxy-net
