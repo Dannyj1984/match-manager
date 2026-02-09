@@ -101,7 +101,7 @@ definePageMeta({
           <div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
           {{ isAdmin ? 'Match Setup' : 'Match Archive' }}
         </div>
-        <h1 class="text-4xl md:text-5xl font-black text-white tracking-tight">FAIRPLAY <span class="text-slate-500">{{
+        <h1 class="text-4xl md:text-5xl font-black text-white tracking-tight">EVENPLAY <span class="text-slate-500">{{
           isAdmin ? 'DRAFT' : 'RESULTS' }}</span></h1>
       </div>
 

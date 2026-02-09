@@ -65,7 +65,7 @@ definePageMeta({
               <Mail
                 class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors"
                 :size="18" />
-              <input v-model="form.email" type="email" required placeholder="coach@fairplay.com"
+              <input v-model="form.email" type="email" required placeholder="admin@eventplay.com"
                 class="w-full bg-slate-900/50 border border-white/5 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all">
             </div>
           </div>
@@ -104,7 +104,7 @@ definePageMeta({
       </div>
 
       <p class="text-center text-[10px] text-slate-600 uppercase tracking-[0.2em] font-bold">
-        Secure Access • FairPlay Pro v1.0
+        Secure Access • EvenPlay Pro v1.0
       </p>
     </div>
   </div>

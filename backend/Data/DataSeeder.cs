@@ -23,7 +23,7 @@ public static class DataSeeder
         }
 
         // 2. Seed Admin User
-        var adminEmail = "admin@fairplay.com";
+        var adminEmail = "admin@evenplay.com";
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
         if (adminUser == null)

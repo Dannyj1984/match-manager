@@ -32,7 +32,7 @@ const handleLogout = async () => {
               stroke-linejoin="round" />
           </svg>
         </NuxtLink>
-        <NuxtLink to="/" class="font-bold tracking-tighter text-lg">FAIRPLAY</NuxtLink>
+        <NuxtLink to="/" class="font-bold tracking-tighter text-lg">EVENPLAY</NuxtLink>
       </div>
 
       <div class="hidden md:flex items-center gap-6">

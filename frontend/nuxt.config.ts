@@ -38,7 +38,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'FairPlay Football',
+      title: 'EvenPlay',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0' },
         { name: 'description', content: 'Fair team balancing for competitive social football.' }

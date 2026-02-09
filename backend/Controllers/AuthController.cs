@@ -40,19 +40,10 @@ public class AuthController : ControllerBase
 
         if (!result.Succeeded) return BadRequest(result.Errors);
 
-        // Assign Role
-        if (request.IsAdmin)
-        {
-            if (!await _roleManager.RoleExistsAsync("Admin"))
-                await _roleManager.CreateAsync(new IdentityRole("Admin"));
-            await _userManager.AddToRoleAsync(user, "Admin");
-        }
-        else
-        {
-            if (!await _roleManager.RoleExistsAsync("User"))
-                await _roleManager.CreateAsync(new IdentityRole("User"));
-            await _userManager.AddToRoleAsync(user, "User");
-        }
+        // Assign default User role
+        if (!await _roleManager.RoleExistsAsync("User"))
+            await _roleManager.CreateAsync(new IdentityRole("User"));
+        await _userManager.AddToRoleAsync(user, "User");
 
         // Create associated Player record
         var player = new Player
@@ -152,6 +143,6 @@ public class AuthController : ControllerBase
     }
 }
 
-public record RegisterRequest(string Email, string Password, string FullName, bool IsAdmin = false);
+public record RegisterRequest(string Email, string Password, string FullName);
 public record LoginRequest(string Email, string Password);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
