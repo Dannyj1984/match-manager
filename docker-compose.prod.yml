@@ -27,7 +27,7 @@ services:
       - ASPNETCORE_URLS=http://+:5000
     networks:
       - evenplay-net
-      - nginx-proxy
+      - nginx-proxy-net
     depends_on:
       - db
 
@@ -45,16 +45,15 @@ services:
       - HOST=0.0.0.0
     networks:
       - evenplay-net
-      - nginx-proxy
+      - nginx-proxy-net
     depends_on:
       - backend
 
 networks:
   evenplay-net:
     driver: bridge
-  nginx-proxy:
+  nginx-proxy-net:
     external: true
-    name: nginx-proxy_default
 
 volumes:
   postgres_data_prod:
