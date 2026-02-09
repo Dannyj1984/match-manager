@@ -196,7 +196,7 @@ export const useLeague = () => {
         email: string
         fullName: string
         password: string
-        preferredPosition?: string
+        preferredPosition?: string[]
     }) => {
         try {
             const response = await $fetch(`/api/leagues/${leagueId}/create-admin`, {

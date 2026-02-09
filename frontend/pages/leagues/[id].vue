@@ -77,13 +77,17 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-2">Preferred Position (Optional)</label>
-              <select v-model="adminForm.preferredPosition"
-                class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none">
-                <option value="">Any</option>
-                <option v-for="position in availablePositions" :key="position" :value="position">
+              <div class="grid grid-cols-4 gap-2">
+                <button v-for="position in availablePositions" :key="position" type="button"
+                  @click="toggleAdminPosition(position)" :class="[
+                    'py-2 px-1 rounded-lg text-xs font-bold transition-all',
+                    adminForm.preferredPosition.includes(position)
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  ]">
                   {{ position }}
-                </option>
-              </select>
+                </button>
+              </div>
             </div>
           </div>
           <button type="submit" class="btn-primary">Create Admin Account</button>
@@ -165,13 +169,24 @@ const adminForm = ref({
   fullName: '',
   email: '',
   password: '',
-  preferredPosition: ''
+  preferredPosition: [] as string[]
 })
 
 // Get positions based on current league sport
 const availablePositions = computed(() => {
   return getPositionsForSport(leagueForm.value.sport)
 })
+
+const toggleAdminPosition = (pos: string) => {
+  const index = adminForm.value.preferredPosition.indexOf(pos)
+  if (index > -1) {
+    // Remove
+    adminForm.value.preferredPosition.splice(index, 1)
+  } else {
+    // Add
+    adminForm.value.preferredPosition.push(pos)
+  }
+}
 
 onMounted(async () => {
   // Fetch league details and members
@@ -223,7 +238,7 @@ const handleCreateAdmin = async () => {
       fullName: '',
       email: '',
       password: '',
-      preferredPosition: ''
+      preferredPosition: []
     }
     // Reload members list
     await loadLeagueData()
