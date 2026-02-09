@@ -46,6 +46,11 @@ onMounted(async () => {
     isLoading.value = false
 })
 
+const filterPositions = (sport: string, positions: string[]): string[] => {
+    const allowed = sport.toLowerCase() === 'netball' ? ['GK', 'GD', 'WD', 'C', 'WA', 'GA', 'GS'] : ['GK', 'D', 'M', 'A']
+    return positions.filter((p) => allowed.includes(p))
+}
+
 const handleSave = async () => {
     isSaving.value = true
     successMessage.value = ''
@@ -53,7 +58,7 @@ const handleSave = async () => {
 
     const result = await store.updateProfile({
         fullName: form.fullName,
-        preferredPosition: form.preferredPosition.filter((p) => p !== 'Any')
+        preferredPosition: filterPositions(currentLeague.value?.sport || 'Football', form.preferredPosition)
     })
 
     if (result.success) {
@@ -295,7 +300,7 @@ definePageMeta({
                                                 <Loader2 v-if="isChangingPassword" :size="18" class="animate-spin" />
                                                 <Lock v-else :size="18" />
                                                 <span>{{ isChangingPassword ? 'Updating...' : 'Update Password'
-                                                }}</span>
+                                                    }}</span>
                                             </button>
                                         </div>
                                     </div>
