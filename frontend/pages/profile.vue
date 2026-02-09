@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
-import { User, Mail, Star, Save, Loader2, CheckCircle, Lock, ChevronDown } from 'lucide-vue-next'
+import { User, Mail, Star, Save, Loader2, CheckCircle, Lock, ChevronDown, Trophy, Flame, Clock, Medal } from 'lucide-vue-next'
 
 const { currentLeague } = useLeague()
 const { getPositionsForSport } = useSportPositions()
@@ -16,6 +16,14 @@ const form = reactive({
     fullName: '',
     preferredPosition: ['M'],
     currentRating: 0
+})
+
+const stats = ref({
+    gamesPlayed: 0,
+    currentStreak: 0,
+    highestRating4Weeks: null as number | null,
+    isGoldenBoot: false,
+    earlyBirdCount: 0
 })
 
 const passwordForm = reactive({
@@ -42,6 +50,20 @@ onMounted(async () => {
         form.fullName = profile.fullName
         form.preferredPosition = profile.preferredPosition
         form.currentRating = profile.currentRating
+
+        // Fetch Stats
+        try {
+            const { token } = useAuth()
+            const statsData = await $fetch<any>(`/api/players/${profile.id}/stats`, {
+                headers: { 
+                    'Authorization': token.value,
+                    'X-League-Id': currentLeague.value?.id
+                }
+            })
+            stats.value = statsData
+        } catch (e) {
+            console.error('Failed to fetch stats', e)
+        }
     }
     isLoading.value = false
 })
@@ -188,6 +210,53 @@ definePageMeta({
                                 <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pos</p>
                                 <p class="text-xl font-black text-primary">{{ form.preferredPosition.join(', ') }}</p>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Achievements Card -->
+                    <div class="glass-card p-6 border-white/5 space-y-4">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <Trophy :size="14" /> Stats & Badges
+                        </h3>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                             <!-- Games Played -->
+                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-blue-500/30 transition-colors">
+                                 <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                     <Medal :size="16" />
+                                 </div>
+                                 <span class="text-2xl font-black text-white">{{ stats.gamesPlayed }}</span>
+                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Games</span>
+                             </div>
+
+                             <!-- Streak -->
+                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-orange-500/30 transition-colors">
+                                 <div class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                     <Flame :size="16" />
+                                 </div>
+                                 <span class="text-2xl font-black text-white">{{ stats.currentStreak }}</span>
+                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Streak</span>
+                             </div>
+
+                             <!-- Golden Boot / 4 Week Rating -->
+                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center relative overflow-hidden group hover:border-yellow-500/30 transition-colors" :class="{'ring-1 ring-yellow-500/50': stats.isGoldenBoot}">
+                                 <div class="absolute inset-0 bg-yellow-500/10" v-if="stats.isGoldenBoot"></div>
+                                 <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center mb-2 relative z-10 group-hover:scale-110 transition-transform">
+                                     <Trophy :size="16" />
+                                 </div>
+                                 <span class="text-lg font-black text-white relative z-10">{{ stats.highestRating4Weeks ? stats.highestRating4Weeks.toFixed(1) : '-' }}</span>
+                                 <span class="text-[10px] text-slate-500 uppercase font-bold relative z-10">4-Wk Rating</span>
+                                 <div v-if="stats.isGoldenBoot" class="absolute top-0 right-0 w-3 h-3 bg-yellow-500 rounded-bl-lg"></div>
+                             </div>
+
+                             <!-- Early Bird -->
+                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-emerald-500/30 transition-colors">
+                                 <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                     <Clock :size="16" />
+                                 </div>
+                                 <span class="text-2xl font-black text-white">{{ stats.earlyBirdCount }}</span>
+                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Early Bird</span>
+                             </div>
                         </div>
                     </div>
                 </div>

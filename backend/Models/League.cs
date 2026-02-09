@@ -33,6 +33,8 @@ public class League
     
     public bool IsActive { get; set; } = true;
     
+    public bool AllowRatings { get; set; } = true;
+    
     // Navigation properties
     [JsonIgnore]
     public ApplicationUser? CreatedBy { get; set; }

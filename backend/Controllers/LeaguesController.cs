@@ -45,6 +45,7 @@ public class LeaguesController : ControllerBase
                     l.MaxTeams,
                     l.Location,
                     l.Description,
+                    l.AllowRatings,
                     Role = "SuperAdmin"
                 })
                 .ToListAsync();
@@ -65,6 +66,7 @@ public class LeaguesController : ControllerBase
                 lm.League.Location,
                 lm.League.Description,
                 lm.League.Cost,
+                lm.League.AllowRatings,
                 lm.Role
             })
             .ToListAsync();
@@ -88,6 +90,7 @@ public class LeaguesController : ControllerBase
                 l.Location,
                 l.Description,
                 l.Cost,
+                l.AllowRatings,
                 l.CreatedDate
             })
             .FirstOrDefaultAsync();
@@ -112,6 +115,7 @@ public class LeaguesController : ControllerBase
             Location = request.Location,
             Description = request.Description,
             Cost = request.Cost,
+            AllowRatings = request.AllowRatings,
             CreatedByUserId = userId!,
             CreatedDate = DateTime.UtcNow,
             IsActive = true
@@ -142,6 +146,7 @@ public class LeaguesController : ControllerBase
             league.Sport,
             league.MaxTeams,
             league.Location,
+            league.AllowRatings,
             Message = "League created successfully"
         });
     }
@@ -160,6 +165,7 @@ public class LeaguesController : ControllerBase
         league.Location = request.Location;
         league.Description = request.Description;
         league.Cost = request.Cost;
+        league.AllowRatings = request.AllowRatings;
 
         await _context.SaveChangesAsync();
 
@@ -398,8 +404,8 @@ public class LeaguesController : ControllerBase
 }
 
 // DTOs
-public record LeagueDto(Guid Id, string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, string Role);
-public record CreateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, string? InitialAdminUserId);
-public record UpdateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost);
+public record LeagueDto(Guid Id, string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, bool AllowRatings, string Role);
+public record CreateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, bool AllowRatings, string? InitialAdminUserId);
+public record UpdateLeagueRequest(string Name, string Sport, int MaxTeams, string? Location, string? Description, decimal Cost, bool AllowRatings);
 public record AddMemberRequest(string Email);
 public record CreateLeagueAdminRequest(string Email, string FullName, string Password, List<string>? PreferredPosition);
