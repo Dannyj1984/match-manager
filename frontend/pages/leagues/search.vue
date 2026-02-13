@@ -14,8 +14,9 @@
         <form @submit.prevent="handleSearch" class="flex flex-col sm:flex-row gap-4">
           <div class="flex-1">
             <label class="block text-sm font-medium mb-2">Postcode</label>
-            <input v-model="searchPostcode" type="text" required placeholder="e.g. SK15 3DT"
+            <input v-model="searchPostcode" type="text" placeholder="e.g. M1 3AA"
               class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none" />
+            <span v-if="postcodeError" class="text-red-500">{{ postcodeError }}</span>
           </div>
           <div class="sm:w-48">
             <label class="block text-sm font-medium mb-2">Distance</label>
@@ -51,9 +52,16 @@
       <!-- Search Results -->
       <div v-if="hasSearched">
         <h2 class="text-xl font-bold mb-4">
-          <span v-if="results.length === 1 && results[0].distanceMiles > searchRadius" class="text-amber-400">
-            No leagues found within {{ searchRadius }} miles. Nearest league:
-          </span>
+          <div v-if="results.length === 1 && results[0].distanceMiles > searchRadius"
+            class="text-amber-400 flex flex-col">
+            <span>
+              No {{ searchSport }} leagues found within {{ searchRadius }} miles.
+            </span>
+            <span>
+              Your nearest league is:
+            </span>
+          </div>
+
           <span v-else>
             {{ results.length }} league{{ results.length !== 1 ? 's' : '' }} found
           </span>
@@ -69,12 +77,17 @@
                   <span class="px-2 py-0.5 rounded bg-slate-700/60 text-xs font-medium">{{ league.sport }}</span>
                   <span v-if="league.location">{{ league.location }}</span>
                   <span v-if="league.postcode">· {{ league.postcode }}</span>
+                  <span v-if="league.lastMatchDate" class="text-xs text-slate-500">
+                    · Last match: {{ new Date(league.lastMatchDate).toLocaleDateString() }}
+                  </span>
                 </div>
-                <p v-if="league.description" class="text-sm text-slate-500 mt-2 line-clamp-2">{{ league.description }}</p>
+                <p v-if="league.description" class="text-sm text-slate-500 mt-2 line-clamp-2">{{ league.description }}
+                </p>
               </div>
               <div class="text-right shrink-0 ml-4">
                 <div class="text-lg font-bold text-primary">{{ league.distanceMiles }} mi</div>
-                <div class="text-xs text-slate-500">{{ league.memberCount }} member{{ league.memberCount !== 1 ? 's' : '' }}</div>
+                <div class="text-xs text-slate-500">{{ league.memberCount }} member{{ league.memberCount !== 1 ? 's' :
+                  '' }}</div>
                 <div v-if="league.isAlreadyMember" class="mt-2">
                   <span class="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded">Member</span>
                 </div>
@@ -87,8 +100,10 @@
         </div>
 
         <div v-else class="glass-card p-12 text-center">
-          <p class="text-slate-400">No public leagues found within {{ searchRadius }} mile{{ searchRadius !== 1 ? 's' : '' }} of {{ searchPostcode }}{{ searchSport !== 'Any' ? ` for ${searchSport}` : '' }}.</p>
-          <p class="text-sm text-slate-500 mt-2">Try increasing the search radius, changing the sport, or using a different postcode.</p>
+          <p class="text-slate-400">No public leagues found within {{ searchRadius }} mile{{ searchRadius !== 1 ? 's' :
+            '' }} of {{ searchPostcode }}{{ searchSport !== 'Any' ? ` for ${searchSport}` : '' }}.</p>
+          <p class="text-sm text-slate-500 mt-2">Try increasing the search radius, changing the sport, or using a
+            different postcode.</p>
         </div>
       </div>
 
@@ -114,19 +129,35 @@ definePageMeta({
 const { searchLeagues } = useLeague()
 
 const searchPostcode = ref('')
+watch(searchPostcode, () => {
+  if (!postcodeValid()) {
+    postcodeError.value = 'Please enter a valid postcode.'
+  } else {
+    postcodeError.value = ''
+  }
+})
 const searchRadius = ref(5)
 const searchSport = ref('Any')
 const results = ref<any[]>([])
 const hasSearched = ref(false)
 const searching = ref(false)
 const searchError = ref('')
+const postcodeError = ref('')
+
+const postcodeValid = () => {
+  const postCodeRegex = /^[A-Za-z]{1,2}[0-9Rr][0-9A-Za-z] ?[0-9][ABD-HJLNP-UW-Zabd-hjlnp-uw-z]{2}$/
+  return postCodeRegex.test(searchPostcode.value.trim())
+}
 
 const handleSearch = async () => {
-  if (!searchPostcode.value.trim()) return
+  if (!postcodeValid()) {
+    postcodeError.value = 'Please enter a valid postcode.'
+    return
+  }
 
   searching.value = true
   searchError.value = ''
-  
+
   try {
     results.value = await searchLeagues(searchPostcode.value.trim(), searchRadius.value, searchSport.value)
     hasSearched.value = true

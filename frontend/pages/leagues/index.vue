@@ -5,10 +5,9 @@
         <h1 class="text-3xl font-bold">My Leagues</h1>
         <NuxtLink to="/leagues/search"
           class="px-4 py-2 bg-slate-700/60 hover:bg-slate-600/60 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-            stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           Find Leagues
         </NuxtLink>
@@ -83,7 +82,7 @@
                 <label class="block text-sm font-medium mb-2">Postcode</label>
                 <input v-model="createForm.postcode" type="text"
                   class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none"
-                  placeholder="e.g. SK15 3DT" />
+                  placeholder="e.g. M1 3AA" />
                 <p class="text-xs text-slate-500 mt-1">UK postcodes only. Used for league search.</p>
               </div>
             </div>
@@ -137,9 +136,9 @@ const handleCreateLeague = async () => {
       ...createForm.value,
       initialAdminUserId: userId
     })
-    
+
     modal.showInfo('League created successfully!', 'Success')
-    
+
     createForm.value = {
       name: '',
       sport: 'Football',

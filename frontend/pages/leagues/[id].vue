@@ -47,7 +47,7 @@
             <label class="block text-sm font-medium mb-2">Postcode</label>
             <input v-model="leagueForm.postcode" type="text"
               class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none"
-              placeholder="e.g. SK15 3DT" />
+              placeholder="e.g. M1 3AA" />
             <p class="text-xs text-slate-500 mt-1">Used for league discovery search. UK postcodes only.</p>
           </div>
 

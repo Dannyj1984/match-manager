@@ -282,7 +282,12 @@ public class LeaguesController : ControllerBase
                 l.Longitude,
                 MemberCount = _context.LeagueMemberships.Count(lm => lm.LeagueId == l.Id),
                 IsAlreadyMember = _context.LeagueMemberships.Any(lm => lm.LeagueId == l.Id && lm.UserId == userId),
-                HasPendingRequest = _context.LeagueJoinRequests.Any(jr => jr.LeagueId == l.Id && jr.UserId == userId && jr.Status == "Pending")
+                HasPendingRequest = _context.LeagueJoinRequests.Any(jr => jr.LeagueId == l.Id && jr.UserId == userId && jr.Status == "Pending"),
+                LastMatchDate = _context.Matches
+                    .Where(m => m.LeagueId == l.Id && m.IsCompleted)
+                    .OrderByDescending(m => m.Date)
+                    .Select(m => (DateTime?)m.Date)
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
@@ -301,6 +306,7 @@ public class LeaguesController : ControllerBase
                 l.MemberCount,
                 l.IsAlreadyMember,
                 l.HasPendingRequest,
+                l.LastMatchDate,
                 DistanceMiles = CalculateDistanceMiles(
                     searchCoords.Value.lat, searchCoords.Value.lng,
                     l.Latitude!.Value, l.Longitude!.Value)
@@ -312,13 +318,15 @@ public class LeaguesController : ControllerBase
             .Where(l => l.DistanceMiles <= radiusMiles)
             .ToList();
 
-        // If no results found within radius, return the nearest one (if any exists)
-        if (results.Count == 0 && distanceResults.Count > 0)
+        // If no results found within radius, return the nearest one (if any exists) that the user is not already a member of
+        if (results.Count == 0)
         {
-            results.Add(distanceResults.First());
+            var nearestNotMember = distanceResults.FirstOrDefault(l => !l.IsAlreadyMember);
+            if (nearestNotMember != null)
+            {
+                results.Add(nearestNotMember);
+            }
         }
-
-        return Ok(results);
 
         return Ok(results);
     }
