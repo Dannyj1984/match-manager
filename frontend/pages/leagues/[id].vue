@@ -37,14 +37,31 @@
           </div>
 
           <div>
+            <label class="block text-sm font-medium mb-2">Location</label>
             <input v-model="leagueForm.location" type="text"
-              class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none" />
+              class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none"
+              placeholder="e.g. Central Park Sports Centre" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-2">Postcode</label>
+            <input v-model="leagueForm.postcode" type="text"
+              class="w-full px-4 py-2 rounded-lg bg-slate-800 border border-white/10 focus:border-primary outline-none"
+              placeholder="e.g. M1 3AA" />
+            <p class="text-xs text-slate-500 mt-1">Used for league discovery search. UK postcodes only.</p>
           </div>
 
           <div class="flex items-center gap-3">
             <input v-model="leagueForm.allowRatings" type="checkbox" id="allowRatings"
               class="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
             <label for="allowRatings" class="text-sm font-medium">Enable Player Ratings</label>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input v-model="leagueForm.isPublic" type="checkbox" id="isPublic"
+              class="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+            <label for="isPublic" class="text-sm font-medium">Public League</label>
+            <span class="text-xs text-slate-500">(Discoverable via search)</span>
           </div>
 
           <div>
@@ -55,6 +72,36 @@
 
           <button type="submit" class="btn-primary">Save Changes</button>
         </form>
+      </div>
+
+      <!-- Pending Join Requests -->
+      <div v-if="joinRequests.length > 0" class="glass-card p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4">
+          Pending Join Requests
+          <span class="ml-2 px-2 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-400 rounded-full">
+            {{ joinRequests.length }}
+          </span>
+        </h2>
+        <div class="space-y-3">
+          <div v-for="request in joinRequests" :key="request.id"
+            class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-white/5">
+            <div>
+              <div class="font-medium">{{ request.fullName }} ({{ request.email }})</div>
+              <div class="text-sm text-slate-400">Requested {{ new Date(request.requestedDate).toLocaleDateString() }}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="handleApproveRequest(request.id)"
+                class="px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
+                Approve
+              </button>
+              <button @click="handleRejectRequest(request.id)"
+                class="px-4 py-2 text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors">
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Create League Admin -->
@@ -152,7 +199,7 @@ definePageMeta({
 
 const route = useRoute()
 
-const { updateLeague, getLeague, getLeagueMembers, addMember, removeMember, promoteToAdmin, demoteAdmin, createLeagueAdmin } = useLeague()
+const { updateLeague, getLeague, getLeagueMembers, addMember, removeMember, promoteToAdmin, demoteAdmin, createLeagueAdmin, getJoinRequests, approveJoinRequest, rejectJoinRequest } = useLeague()
 const { data } = useAuth()
 const { getPositionsForSport } = useSportPositions()
 const modal = useModal()
@@ -160,6 +207,7 @@ const modal = useModal()
 const leagueId = route.params.id as string
 const league = ref<any>(null)
 const members = ref<any[]>([])
+const joinRequests = ref<any[]>([])
 const newMemberEmail = ref('')
 
 const leagueForm = ref({
@@ -168,7 +216,9 @@ const leagueForm = ref({
   maxTeams: 2,
   location: '',
   description: '',
-  allowRatings: true
+  allowRatings: true,
+  isPublic: false,
+  postcode: ''
 })
 
 const adminForm = ref({
@@ -212,12 +262,22 @@ const loadLeagueData = async () => {
         maxTeams: league.value.maxTeams,
         location: league.value.location || '',
         description: league.value.description || '',
-        allowRatings: league.value.allowRatings !== false // Default to true if undefined
+        allowRatings: league.value.allowRatings !== false, // Default to true if undefined
+        isPublic: league.value.isPublic || false,
+        postcode: league.value.postcode || ''
       }
     }
 
     // Fetch members
     members.value = await getLeagueMembers(leagueId) as any[]
+
+    // Fetch join requests
+    try {
+      joinRequests.value = await getJoinRequests(leagueId)
+    } catch (error) {
+      // User might not be admin, that's ok
+      joinRequests.value = []
+    }
   } catch (error) {
     console.error('Failed to load league data:', error)
   }
@@ -295,6 +355,29 @@ const handleDemote = async (userId: string) => {
   } catch (error) {
     console.error('Failed to demote user:', error)
     alert('Failed to demote user')
+  }
+}
+
+const handleApproveRequest = async (requestId: string) => {
+  try {
+    await approveJoinRequest(leagueId, requestId)
+    modal.showInfo('Join request approved! Player has been added to the league.', 'Approved')
+    await loadLeagueData()
+  } catch (error) {
+    console.error('Failed to approve request:', error)
+    modal.showError('Failed to approve join request', 'Error')
+  }
+}
+
+const handleRejectRequest = async (requestId: string) => {
+  if (confirm('Are you sure you want to reject this join request?')) {
+    try {
+      await rejectJoinRequest(leagueId, requestId)
+      await loadLeagueData()
+    } catch (error) {
+      console.error('Failed to reject request:', error)
+      modal.showError('Failed to reject join request', 'Error')
+    }
   }
 }
 </script>

@@ -15,6 +15,7 @@ public class FairPlayDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<League> Leagues => Set<League>();
     public DbSet<LeagueMembership> LeagueMemberships => Set<LeagueMembership>();
     public DbSet<PlayerRating> PlayerRatings => Set<PlayerRating>();
+    public DbSet<LeagueJoinRequest> LeagueJoinRequests => Set<LeagueJoinRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,12 @@ public class FairPlayDbContext : IdentityDbContext<ApplicationUser>
             .IsUnique();
 
         // Relationship configuration
+        // Unique index for join requests (one pending request per user per league)
+        modelBuilder.Entity<LeagueJoinRequest>()
+            .HasIndex(jr => new { jr.LeagueId, jr.UserId })
+            .HasFilter("\"Status\" = 'Pending'")
+            .IsUnique();
+
         modelBuilder.Entity<RawRating>()
             .HasOne(r => r.Rater)
             .WithMany()

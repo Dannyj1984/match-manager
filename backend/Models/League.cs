@@ -35,6 +35,14 @@ public class League
     
     public bool AllowRatings { get; set; } = true;
     
+    public bool IsPublic { get; set; } = false;
+    
+    [MaxLength(10)]
+    public string? Postcode { get; set; }
+    
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public ApplicationUser? CreatedBy { get; set; }
