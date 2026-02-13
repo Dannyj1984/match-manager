@@ -60,6 +60,7 @@ builder.Services.AddDbContext<FairPlayDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 // Register Services
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<ITeamBalancerService, TeamBalancerService>();
 builder.Services.AddScoped<IMatchRatingService, MatchRatingService>();
 

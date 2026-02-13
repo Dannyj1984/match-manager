@@ -57,6 +57,8 @@ export const useLeague = () => {
         maxTeams: number
         location?: string
         description?: string
+        isPublic?: boolean
+        postcode?: string
         initialAdminUserId?: string
     }) => {
         try {
@@ -83,6 +85,8 @@ export const useLeague = () => {
         location?: string
         description?: string
         allowRatings?: boolean
+        isPublic?: boolean
+        postcode?: string
     }) => {
         try {
             await $fetch(`/api/leagues/${leagueId}`, {
@@ -216,6 +220,101 @@ export const useLeague = () => {
         }
     }
 
+    // --- New methods for public leagues & join requests ---
+
+    const searchLeagues = async (postcode: string, radiusMiles: number = 5, sport: string = 'Any') => {
+        try {
+            let url = `/api/leagues/search?postcode=${encodeURIComponent(postcode)}&radiusMiles=${radiusMiles}`
+            if (sport && sport !== 'Any') {
+                url += `&sport=${encodeURIComponent(sport)}`
+            }
+
+            const response = await $fetch(url, {
+                headers: {
+                    Authorization: `${token.value}`
+                }
+            })
+            return response as any[]
+        } catch (error) {
+            console.error('Failed to search leagues:', error)
+            throw error
+        }
+    }
+
+    const getPublicLeague = async (leagueId: string) => {
+        try {
+            const response = await $fetch(`/api/leagues/${leagueId}/public`, {
+                headers: {
+                    Authorization: `${token.value}`
+                }
+            })
+            return response
+        } catch (error) {
+            console.error('Failed to fetch public league:', error)
+            throw error
+        }
+    }
+
+    const requestToJoin = async (leagueId: string) => {
+        try {
+            const response = await $fetch(`/api/leagues/${leagueId}/join`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `${token.value}`
+                }
+            })
+            return response
+        } catch (error) {
+            console.error('Failed to request join:', error)
+            throw error
+        }
+    }
+
+    const getJoinRequests = async (leagueId: string) => {
+        try {
+            const response = await $fetch(`/api/leagues/${leagueId}/join-requests`, {
+                headers: {
+                    Authorization: `${token.value}`,
+                    'X-League-Id': leagueId
+                }
+            })
+            return response as any[]
+        } catch (error) {
+            console.error('Failed to fetch join requests:', error)
+            throw error
+        }
+    }
+
+    const approveJoinRequest = async (leagueId: string, requestId: string) => {
+        try {
+            await $fetch(`/api/leagues/${leagueId}/join-requests/${requestId}/approve`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `${token.value}`,
+                    'X-League-Id': leagueId
+                }
+            })
+        } catch (error) {
+            console.error('Failed to approve join request:', error)
+            throw error
+        }
+    }
+
+    const rejectJoinRequest = async (leagueId: string, requestId: string) => {
+        try {
+            await $fetch(`/api/leagues/${leagueId}/join-requests/${requestId}/reject`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `${token.value}`,
+                    'X-League-Id': leagueId
+                }
+            })
+        } catch (error) {
+            console.error('Failed to reject join request:', error)
+            throw error
+        }
+    }
+
     return {
         currentLeague,
         userLeagues,
@@ -230,6 +329,12 @@ export const useLeague = () => {
         removeMember,
         promoteToAdmin,
         demoteAdmin,
-        createLeagueAdmin
+        createLeagueAdmin,
+        searchLeagues,
+        getPublicLeague,
+        requestToJoin,
+        getJoinRequests,
+        approveJoinRequest,
+        rejectJoinRequest
     }
 }
