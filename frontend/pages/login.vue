@@ -54,7 +54,7 @@ definePageMeta({
         </div>
         <h1 class="text-4xl font-black text-white tracking-tighter italic">FAIR<span class="text-primary">PLAY</span>
         </h1>
-        <p class="text-slate-400 font-medium">Log in to manage your football sessions</p>
+        <p class="text-slate-400 font-medium">Login</p>
       </div>
 
       <div class="glass-card p-8 border-slate-800 shadow-2xl">

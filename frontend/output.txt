@@ -1,0 +1,24 @@
+
+> test
+> jest tests/pages/login.spec.ts --collectCoverage=false
+
+FAIL tests/pages/login.spec.ts
+  ● Test suite failed to run
+
+    TypeError: Cannot set properties of undefined (setting 'useAuth')
+
+    [0m [90m 10 |[39m
+     [90m 11 |[39m     [90m// Define globals that Nuxt usually provides[39m
+    [31m[1m>[22m[39m[90m 12 |[39m     (window [36mas[39m any)[33m.[39museAuth [33m=[39m () [33m=>[39m ({
+     [90m    |[39m                            [31m[1m^[22m[39m
+     [90m 13 |[39m         signIn[33m:[39m mockSignIn
+     [90m 14 |[39m     })[33m;[39m
+     [90m 15 |[39m (window [36mas[39m any)[33m.[39museRouter [33m=[39m () [33m=>[39m ({[0m
+
+      at Object.<anonymous> (tests/pages/login.spec.ts:12:28)
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        4.396 s
+Ran all test suites matching /tests\\pages\\login.spec.ts/i.
