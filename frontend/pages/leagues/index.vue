@@ -111,8 +111,7 @@ definePageMeta({
 })
 
 const { data } = useAuth()
-const { userLeagues, fetchUserLeagues, createLeague, setCurrentLeague } = useLeague()
-const router = useRouter()
+const { userLeagues, fetchUserLeagues, createLeague } = useLeague()
 const modal = useModal()
 
 const createForm = ref({
