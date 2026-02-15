@@ -105,7 +105,7 @@
       </div>
 
       <!-- Create League Admin -->
-      <div v-if="(data as any)?.user?.roles" class="glass-card p-6 mb-6">
+      <div v-if="(data as unknown as AuthSessionData | null)?.user?.roles" class="glass-card p-6 mb-6">
         <h2 class="text-xl font-bold mb-4">Create League Admin</h2>
         <p class="text-slate-400 text-sm mb-4">Create a new user account and assign them as an admin for this league.
         </p>
@@ -159,7 +159,7 @@
 
         <!-- Members List -->
         <div class="space-y-3">
-          <div v-for="member in members" :key="member.UserId"
+          <div v-for="member in members" :key="member.userId"
             class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
             <div>
               <div class="font-medium">{{ member.email }}</div>
@@ -170,15 +170,15 @@
                 class="px-3 py-1 text-xs font-medium rounded">
                 {{ member.role }}
               </span>
-              <button v-if="member.Role === 'Member'" @click="handlePromote(member.UserId)"
+              <button v-if="member.role === 'Member'" @click="handlePromote(member.userId)"
                 class="text-sm text-blue-400 hover:text-blue-300">
                 Promote
               </button>
-              <button v-else-if="member.Role === 'Admin'" @click="handleDemote(member.UserId)"
+              <button v-else-if="member.role === 'Admin'" @click="handleDemote(member.userId)"
                 class="text-sm text-orange-400 hover:text-orange-300">
                 Demote
               </button>
-              <button @click="handleRemove(member.UserId)" class="text-sm text-red-400 hover:text-red-300">
+              <button @click="handleRemove(member.userId)" class="text-sm text-red-400 hover:text-red-300">
                 Remove
               </button>
             </div>
@@ -193,6 +193,10 @@
 </template>
 
 <script setup lang="ts">
+import type { ApiError } from '~/types/api'
+import type { AuthSessionData } from '~/types/auth'
+import type { LeagueDetail, LeagueJoinRequest, LeagueMember } from '~/types/league'
+
 definePageMeta({
   middleware: 'auth'
 })
@@ -205,9 +209,9 @@ const { getPositionsForSport } = useSportPositions()
 const modal = useModal()
 
 const leagueId = route.params.id as string
-const league = ref<any>(null)
-const members = ref<any[]>([])
-const joinRequests = ref<any[]>([])
+const league = ref<LeagueDetail | null>(null)
+const members = ref<LeagueMember[]>([])
+const joinRequests = ref<LeagueJoinRequest[]>([])
 const newMemberEmail = ref('')
 
 const leagueForm = ref({
@@ -269,7 +273,7 @@ const loadLeagueData = async () => {
     }
 
     // Fetch members
-    members.value = await getLeagueMembers(leagueId) as any[]
+    members.value = await getLeagueMembers(leagueId)
 
     // Fetch join requests
     try {
@@ -287,7 +291,7 @@ const handleUpdateLeague = async () => {
   try {
     await updateLeague(leagueId, leagueForm.value)
     modal.showInfo(
-      `League ${league.value.name} has been updated successfully!`,
+      `League ${league.value?.name} has been updated successfully!`,
       'Update League'
     )
   } catch (error) {
@@ -309,9 +313,10 @@ const handleCreateAdmin = async () => {
     }
     // Reload members list
     await loadLeagueData()
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const apiErr = error as ApiError
     console.error('Failed to create league admin:', error)
-    modal.showError(error.data?.Message || 'Failed to create league admin', 'Error')
+    modal.showError(apiErr.data?.Message || 'Failed to create league admin', 'Error')
   }
 }
 

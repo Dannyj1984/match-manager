@@ -1,16 +1,18 @@
+import type { League, LeagueDetail, LeagueMember, LeagueJoinRequest, LeagueSearchResult, PublicLeague } from '~/types/league'
+
 export const useLeague = () => {
-    const currentLeague = useState<any>('currentLeague', () => null)
-    const userLeagues = useState<any[]>('userLeagues', () => [])
+    const currentLeague = useState<League | null>('currentLeague', () => null)
+    const userLeagues = useState<League[]>('userLeagues', () => [])
     const { token } = useAuth()
 
     const fetchUserLeagues = async () => {
         try {
-            const response = await $fetch('/api/leagues', {
+            const response = await $fetch<League[]>('/api/leagues', {
                 headers: {
                     Authorization: `${token.value}`
                 }
             })
-            userLeagues.value = response as any[]
+            userLeagues.value = response
 
             // Try to restore previously selected league from localStorage
             const savedLeagueId = process.client ? localStorage.getItem('selectedLeagueId') : null
@@ -35,7 +37,7 @@ export const useLeague = () => {
         }
     }
 
-    const setCurrentLeague = (league: any) => {
+    const setCurrentLeague = (league: League) => {
         currentLeague.value = league
         // Persist selection to localStorage
         if (process.client && league) {
@@ -105,9 +107,9 @@ export const useLeague = () => {
         }
     }
 
-    const getLeagueMembers = async (leagueId: string) => {
+    const getLeagueMembers = async (leagueId: string): Promise<LeagueMember[]> => {
         try {
-            const response = await $fetch(`/api/leagues/${leagueId}/members`, {
+            const response = await $fetch<LeagueMember[]>(`/api/leagues/${leagueId}/members`, {
                 headers: {
                     Authorization: `${token.value}`,
                     'X-League-Id': leagueId
@@ -182,9 +184,9 @@ export const useLeague = () => {
         }
     }
 
-    const getLeague = async (leagueId: string) => {
+    const getLeague = async (leagueId: string): Promise<LeagueDetail> => {
         try {
-            const response = await $fetch(`/api/leagues/${leagueId}`, {
+            const response = await $fetch<LeagueDetail>(`/api/leagues/${leagueId}`, {
                 headers: {
                     Authorization: `${token.value}`,
                     'X-League-Id': leagueId
@@ -220,30 +222,30 @@ export const useLeague = () => {
         }
     }
 
-    // --- New methods for public leagues & join requests ---
+    // --- Public leagues & join requests ---
 
-    const searchLeagues = async (postcode: string, radiusMiles: number = 5, sport: string = 'Any') => {
+    const searchLeagues = async (postcode: string, radiusMiles: number = 5, sport: string = 'Any'): Promise<LeagueSearchResult[]> => {
         try {
             let url = `/api/leagues/search?postcode=${encodeURIComponent(postcode)}&radiusMiles=${radiusMiles}`
             if (sport && sport !== 'Any') {
                 url += `&sport=${encodeURIComponent(sport)}`
             }
 
-            const response = await $fetch(url, {
+            const response = await $fetch<LeagueSearchResult[]>(url, {
                 headers: {
                     Authorization: `${token.value}`
                 }
             })
-            return response as any[]
+            return response
         } catch (error) {
             console.error('Failed to search leagues:', error)
             throw error
         }
     }
 
-    const getPublicLeague = async (leagueId: string) => {
+    const getPublicLeague = async (leagueId: string): Promise<PublicLeague> => {
         try {
-            const response = await $fetch(`/api/leagues/${leagueId}/public`, {
+            const response = await $fetch<PublicLeague>(`/api/leagues/${leagueId}/public`, {
                 headers: {
                     Authorization: `${token.value}`
                 }
@@ -270,15 +272,15 @@ export const useLeague = () => {
         }
     }
 
-    const getJoinRequests = async (leagueId: string) => {
+    const getJoinRequests = async (leagueId: string): Promise<LeagueJoinRequest[]> => {
         try {
-            const response = await $fetch(`/api/leagues/${leagueId}/join-requests`, {
+            const response = await $fetch<LeagueJoinRequest[]>(`/api/leagues/${leagueId}/join-requests`, {
                 headers: {
                     Authorization: `${token.value}`,
                     'X-League-Id': leagueId
                 }
             })
-            return response as any[]
+            return response
         } catch (error) {
             console.error('Failed to fetch join requests:', error)
             throw error

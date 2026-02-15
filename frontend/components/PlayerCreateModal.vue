@@ -74,8 +74,8 @@ const handleSubmit = async () => {
             result = { success: true }
             // Refresh players list
             await store.fetchPlayers()
-        } catch (err: any) {
-            result = { success: false, error: err.message || 'Failed to add existing player' }
+        } catch (err: unknown) {
+            result = { success: false, error: (err instanceof Error ? err.message : 'Failed to add existing player') }
         }
     }
 
@@ -83,7 +83,7 @@ const handleSubmit = async () => {
         resetForm()
         emit('close')
     } else {
-        error.value = result.error
+        error.value = result.error || 'An unknown error occurred'
     }
 
     isLoading.value = false
@@ -106,7 +106,7 @@ const handleSubmit = async () => {
                     <div>
                         <h2 class="text-xl font-bold text-white">Add Player</h2>
                         <p class="text-sm text-slate-400">{{ mode === 'new' ? 'Create new account' : 'Add existing user'
-                            }}</p>
+                        }}</p>
                     </div>
                 </div>
                 <button @click="emit('close')"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
 import { Trophy, ChevronRight, Activity, Calendar, Star, TrendingUp } from 'lucide-vue-next'
+import type { DashboardData } from '~/types/match'
+import type { AuthSessionData } from '~/types/auth'
 
 definePageMeta({
   middleware: ['league']
@@ -8,13 +10,7 @@ definePageMeta({
 
 const store = useMatchStore()
 const { status, data } = useAuth()
-const dashboardData = ref<{
-  lastCompletedMatchDate: string,
-  nextActiveMatchDate: string,
-  pendingRatingMatchDate?: string,
-  recentPerformance: { date: string, value: number }[]
-  needsLeague?: boolean
-}>({
+const dashboardData = ref<DashboardData>({
   lastCompletedMatchDate: '',
   nextActiveMatchDate: '',
   recentPerformance: []
@@ -24,7 +20,7 @@ const isLoading = ref(false)
 const { currentLeague } = useLeague()
 
 watchEffect(() => {
-  if (status.value === 'authenticated' && (data.value as any)?.user?.isSuperAdmin === true) {
+  if (status.value === 'authenticated' && (data.value as AuthSessionData | null)?.user?.isSuperAdmin === true) {
     navigateTo('/leagues')
   }
 })
@@ -32,7 +28,8 @@ watchEffect(() => {
 watch(currentLeague, async (newLeague) => {
   if (status.value === 'authenticated' && newLeague) {
     isLoading.value = true
-    dashboardData.value = await store.fetchDashboard()
+    const result = await store.fetchDashboard()
+    if (result) dashboardData.value = result
     isLoading.value = false
   }
 }, { immediate: true })

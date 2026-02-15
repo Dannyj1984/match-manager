@@ -122,6 +122,9 @@
 </template>
 
 <script setup lang="ts">
+import type { ApiError } from '~/types/api'
+import type { LeagueSearchResult } from '~/types/league'
+
 definePageMeta({
   middleware: 'auth'
 })
@@ -138,7 +141,7 @@ watch(searchPostcode, () => {
 })
 const searchRadius = ref(5)
 const searchSport = ref('Any')
-const results = ref<any[]>([])
+const results = ref<LeagueSearchResult[]>([])
 const hasSearched = ref(false)
 const searching = ref(false)
 const searchError = ref('')
@@ -161,8 +164,9 @@ const handleSearch = async () => {
   try {
     results.value = await searchLeagues(searchPostcode.value.trim(), searchRadius.value, searchSport.value)
     hasSearched.value = true
-  } catch (error: any) {
-    searchError.value = error.data?.message || 'Failed to search leagues. Please check the postcode and try again.'
+  } catch (error: unknown) {
+    const apiErr = error as ApiError
+    searchError.value = apiErr.data?.message || 'Failed to search leagues. Please check the postcode and try again.'
     results.value = []
     hasSearched.value = true
   } finally {

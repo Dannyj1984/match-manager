@@ -13,7 +13,8 @@
 
       <div v-else-if="league" class="glass-card p-8">
         <div class="mb-6">
-          <span class="px-3 py-1 text-xs font-medium bg-slate-700/60 rounded mb-3 inline-block">{{ league.sport }}</span>
+          <span class="px-3 py-1 text-xs font-medium bg-slate-700/60 rounded mb-3 inline-block">{{ league.sport
+          }}</span>
           <h1 class="text-3xl font-bold mb-2">{{ league.name }}</h1>
           <div class="flex items-center gap-3 text-sm text-slate-400">
             <span v-if="league.location">📍 {{ league.location }}</span>
@@ -42,7 +43,8 @@
         <div v-if="league.isAlreadyMember" class="text-center">
           <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
             <p class="text-green-400 font-medium">✓ You're already a member of this league</p>
-            <NuxtLink :to="`/leagues/${league.id}`" class="text-sm text-green-300 underline hover:no-underline mt-1 inline-block">
+            <NuxtLink :to="`/leagues/${league.id}`"
+              class="text-sm text-green-300 underline hover:no-underline mt-1 inline-block">
               Go to league →
             </NuxtLink>
           </div>
@@ -72,6 +74,9 @@
 </template>
 
 <script setup lang="ts">
+import type { ApiError } from '~/types/api'
+import type { PublicLeague } from '~/types/league'
+
 definePageMeta({
   middleware: 'auth'
 })
@@ -81,7 +86,7 @@ const { getPublicLeague, requestToJoin } = useLeague()
 const modal = useModal()
 
 const leagueId = route.params.id as string
-const league = ref<any>(null)
+const league = ref<PublicLeague | null>(null)
 const loading = ref(true)
 const joining = ref(false)
 const requestSent = ref(false)
@@ -102,8 +107,9 @@ const handleJoin = async () => {
     await requestToJoin(leagueId)
     requestSent.value = true
     modal.showInfo('Your join request has been sent! The league admin will review it.', 'Request Sent')
-  } catch (error: any) {
-    modal.showError(error.data?.message || 'Failed to send join request', 'Error')
+  } catch (error: unknown) {
+    const apiErr = error as ApiError
+    modal.showError(apiErr.data?.message || 'Failed to send join request', 'Error')
   } finally {
     joining.value = false
   }

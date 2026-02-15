@@ -1,3 +1,5 @@
+import type { League } from "~/types/league"
+
 // Middleware to redirect to leagues page if no league is selected
 export default defineNuxtRouteMiddleware(async (to) => {
     // Skip check for auth-related pages and leagues pages
@@ -14,7 +16,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return
     }
 
-    const currentLeague = useState<any>('currentLeague')
+    const currentLeague = useState<League | null>('currentLeague')
 
     // If no current league, redirect to leagues page
     if (!currentLeague.value) {

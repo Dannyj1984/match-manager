@@ -1,3 +1,5 @@
+import type { AuthSessionData } from "~/types/auth"
+
 export default defineNuxtRouteMiddleware((to, from) => {
     const { status, data } = useAuth()
 
@@ -11,7 +13,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
     // Admin protection
     if (to.path.startsWith('/admin') || to.path.includes('/calculate-teams')) {
-        const userRole = (data.value as any)?.user?.roles || []
+        const userRole = (data.value as AuthSessionData | null)?.user?.roles || []
         if (status.value !== 'authenticated' || !userRole.includes('Admin')) {
             return navigateTo('/login')
         }

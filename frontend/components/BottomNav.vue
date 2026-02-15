@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Home, Calendar, User, Users, ListCheck, Trophy } from 'lucide-vue-next'
+import type { AuthSessionData } from '~/types/auth'
 
 const { data, status } = useAuth()
 const { currentLeague } = useLeague()
 const route = useRoute()
 const isAdmin = computed(() => currentLeague.value?.role === 'Admin')
-const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
+const isSuperAdmin = computed(() => (data.value as AuthSessionData | null)?.user?.isSuperAdmin === true)
 
 const isActive = (path: string) => {
     if (path === '/') {

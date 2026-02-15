@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import '@/assets/css/main.css'
+import type { AuthSessionData } from '~/types/auth'
 const { status, data, signOut } = useAuth()
 const { currentLeague, clearLeague } = useLeague()
 const modal = useModal()
 const router = useRouter()
-const isSuperAdmin = computed(() => (data.value as any)?.user?.isSuperAdmin === true)
+const isSuperAdmin = computed(() => (data.value as AuthSessionData | null)?.user?.isSuperAdmin === true)
 
 const handleLogout = async () => {
   clearLeague()
@@ -67,7 +68,8 @@ const handleLogout = async () => {
         <div v-if="status === 'authenticated'" class="flex items-center gap-4">
           <div class="hidden sm:block text-right">
             <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">User</div>
-            <div class="text-xs font-medium text-slate-300">{{ (data as any)?.user?.email }}</div>
+            <div class="text-xs font-medium text-slate-300">{{ (data as unknown as AuthSessionData | null)?.user?.email
+              }}</div>
           </div>
           <button @click="handleLogout"
             class="w-8 h-8 rounded-full bg-slate-800 border border-white/10 hover:border-danger/50 transition-colors flex items-center justify-center group">

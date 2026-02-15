@@ -2,12 +2,13 @@
 import { useMatchStore } from '@/stores/match'
 import draggable from 'vuedraggable'
 import { ShieldCheck, Zap } from 'lucide-vue-next'
+import type { Player } from '~/types/player'
 
 const store = useMatchStore()
 const props = defineProps<{
   title: string
   teamNumber: number
-  players: any[]
+  players: Player[]
   powerScore: string | number
 }>()
 
