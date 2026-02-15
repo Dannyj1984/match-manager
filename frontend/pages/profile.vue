@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
 import { User, Mail, Star, Save, Loader2, CheckCircle, Lock, ChevronDown, Trophy, Flame, Clock, Medal } from 'lucide-vue-next'
+import type { ApiError } from '~/types/api'
+import type { PlayerStats } from '~/types/player'
 
 const { currentLeague } = useLeague()
 const { getPositionsForSport } = useSportPositions()
@@ -54,10 +56,10 @@ onMounted(async () => {
         // Fetch Stats
         try {
             const { token } = useAuth()
-            const statsData = await $fetch<any>(`/api/players/${profile.id}/stats`, {
-                headers: { 
-                    'Authorization': token.value,
-                    'X-League-Id': currentLeague.value?.id
+            const statsData = await $fetch<PlayerStats>(`/api/players/${profile.id}/stats`, {
+                headers: {
+                    'Authorization': token.value || '',
+                    'X-League-Id': currentLeague.value?.id || ''
                 }
             })
             stats.value = statsData
@@ -87,7 +89,7 @@ const handleSave = async () => {
         successMessage.value = 'Profile updated successfully!'
         setTimeout(() => successMessage.value = '', 3000)
     } else {
-        errorMessage.value = result.error
+        errorMessage.value = result.error || 'Failed to update profile'
     }
     isSaving.value = false
 }
@@ -150,8 +152,9 @@ const handlePasswordChange = async () => {
         passwordForm.newPassword = ''
         passwordForm.confirmPassword = ''
         setTimeout(() => passwordSuccessMessage.value = '', 3000)
-    } catch (error: any) {
-        passwordErrorMessage.value = error.data?.message || 'Failed to change password'
+    } catch (error: unknown) {
+        const apiErr = error as ApiError
+        passwordErrorMessage.value = apiErr.data?.message || 'Failed to change password'
     }
 
     isChangingPassword.value = false
@@ -218,45 +221,56 @@ definePageMeta({
                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <Trophy :size="14" /> Stats & Badges
                         </h3>
-                        
+
                         <div class="grid grid-cols-2 gap-3">
-                             <!-- Games Played -->
-                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-blue-500/30 transition-colors">
-                                 <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                     <Medal :size="16" />
-                                 </div>
-                                 <span class="text-2xl font-black text-white">{{ stats.gamesPlayed }}</span>
-                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Games</span>
-                             </div>
+                            <!-- Games Played -->
+                            <div
+                                class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-blue-500/30 transition-colors">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <Medal :size="16" />
+                                </div>
+                                <span class="text-2xl font-black text-white">{{ stats.gamesPlayed }}</span>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Games</span>
+                            </div>
 
-                             <!-- Streak -->
-                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-orange-500/30 transition-colors">
-                                 <div class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                     <Flame :size="16" />
-                                 </div>
-                                 <span class="text-2xl font-black text-white">{{ stats.currentStreak }}</span>
-                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Streak</span>
-                             </div>
+                            <!-- Streak -->
+                            <div
+                                class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-orange-500/30 transition-colors">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <Flame :size="16" />
+                                </div>
+                                <span class="text-2xl font-black text-white">{{ stats.currentStreak }}</span>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Streak</span>
+                            </div>
 
-                             <!-- Golden Boot / 4 Week Rating -->
-                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center relative overflow-hidden group hover:border-yellow-500/30 transition-colors" :class="{'ring-1 ring-yellow-500/50': stats.isGoldenBoot}">
-                                 <div class="absolute inset-0 bg-yellow-500/10" v-if="stats.isGoldenBoot"></div>
-                                 <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center mb-2 relative z-10 group-hover:scale-110 transition-transform">
-                                     <Trophy :size="16" />
-                                 </div>
-                                 <span class="text-lg font-black text-white relative z-10">{{ stats.highestRating4Weeks ? stats.highestRating4Weeks.toFixed(1) : '-' }}</span>
-                                 <span class="text-[10px] text-slate-500 uppercase font-bold relative z-10">4-Wk Rating</span>
-                                 <div v-if="stats.isGoldenBoot" class="absolute top-0 right-0 w-3 h-3 bg-yellow-500 rounded-bl-lg"></div>
-                             </div>
+                            <!-- Golden Boot / 4 Week Rating -->
+                            <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center relative overflow-hidden group hover:border-yellow-500/30 transition-colors"
+                                :class="{ 'ring-1 ring-yellow-500/50': stats.isGoldenBoot }">
+                                <div class="absolute inset-0 bg-yellow-500/10" v-if="stats.isGoldenBoot"></div>
+                                <div
+                                    class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center mb-2 relative z-10 group-hover:scale-110 transition-transform">
+                                    <Trophy :size="16" />
+                                </div>
+                                <span class="text-lg font-black text-white relative z-10">{{ stats.highestRating4Weeks ?
+                                    stats.highestRating4Weeks.toFixed(1) : '-' }}</span>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold relative z-10">4-Wk
+                                    Rating</span>
+                                <div v-if="stats.isGoldenBoot"
+                                    class="absolute top-0 right-0 w-3 h-3 bg-yellow-500 rounded-bl-lg"></div>
+                            </div>
 
-                             <!-- Early Bird -->
-                             <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-emerald-500/30 transition-colors">
-                                 <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                     <Clock :size="16" />
-                                 </div>
-                                 <span class="text-2xl font-black text-white">{{ stats.earlyBirdCount }}</span>
-                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Early Bird</span>
-                             </div>
+                            <!-- Early Bird -->
+                            <div
+                                class="bg-slate-900/50 p-3 rounded-xl border border-white/5 flex flex-col items-center text-center group hover:border-emerald-500/30 transition-colors">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <Clock :size="16" />
+                                </div>
+                                <span class="text-2xl font-black text-white">{{ stats.earlyBirdCount }}</span>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Early Bird</span>
+                            </div>
                         </div>
                     </div>
                 </div>

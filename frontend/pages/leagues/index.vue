@@ -47,7 +47,7 @@
       </div>
 
       <!-- Create League (Super Admin Only) -->
-      <div v-if="(data as any)?.user?.isSuperAdmin" class="mt-12">
+      <div v-if="(data as unknown as AuthSessionData | null)?.user?.isSuperAdmin" class="mt-12">
         <h2 class="text-2xl font-bold mb-4">Create New League</h2>
         <div class="glass-card p-6">
           <form @submit.prevent="handleCreateLeague" class="space-y-4">
@@ -106,6 +106,8 @@
 </template>
 
 <script setup lang="ts">
+import type { AuthSessionData } from '~/types/auth'
+
 definePageMeta({
   middleware: 'auth'
 })
@@ -130,10 +132,10 @@ onMounted(async () => {
 
 const handleCreateLeague = async () => {
   try {
-    const userId = (data.value as any)?.user?.userId
+    const userId = (data.value as AuthSessionData | null)?.user?.playerId
     const result = await createLeague({
       ...createForm.value,
-      initialAdminUserId: userId
+      initialAdminUserId: userId ?? undefined
     })
 
     modal.showInfo('League created successfully!', 'Success')

@@ -1,26 +1,9 @@
 import { defineStore } from 'pinia'
+import type { Player } from '~/types/player'
+import type { Match, MatchAssignment, DashboardData, RawRating } from '~/types/match'
+import type { PlayerProfile } from '~/types/player'
 
-export interface Player {
-    id: string
-    fullName: string
-    currentRating: number
-    avgMatchRating?: number // Average rating from last 6 months of matches
-    preferredPosition: string[]
-    lastPlayed?: string
-    role?: string // LeagueMembership role: 'Admin', 'Member', 'SuperAdmin'
-    identityUserId?: string // User ID to check for self-demotion
-    stats?: {
-        gamesPlayed: number
-        streak: number
-        rating4Weeks: number | null
-        earlyBird: number
-    }
-}
-
-export interface MatchAssignment {
-    playerId: string
-    teamNumber: number
-}
+export type { Player, MatchAssignment }
 
 export const useMatchStore = defineStore('match', {
     state: () => ({
@@ -29,7 +12,7 @@ export const useMatchStore = defineStore('match', {
         teams: {} as Record<number, Player[]>,
         matchStatus: 'Draft' as 'Draft' | 'Active' | 'Completed',
         isLoading: false,
-        user: null as any,
+        user: null as PlayerProfile | null,
         currentPlayerId: null as string | null,
 
         // New Draft Config
@@ -89,8 +72,9 @@ export const useMatchStore = defineStore('match', {
                 this.availablePlayers.push(newPlayer)
                 this.availablePlayers.sort((a, b) => b.currentRating - a.currentRating)
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to create player', error)
+            } catch (err: unknown) {
+                console.error('Failed to create player', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to create player' }
             }
         },
@@ -102,8 +86,9 @@ export const useMatchStore = defineStore('match', {
                     method: 'POST'
                 })
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to promote player', error)
+            } catch (err: unknown) {
+                console.error('Failed to promote player', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to promote player' }
             }
         },
@@ -117,8 +102,9 @@ export const useMatchStore = defineStore('match', {
                 // Refresh player list to get updated roles
                 await this.fetchPlayers()
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to demote player', error)
+            } catch (err: unknown) {
+                console.error('Failed to demote player', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to demote player' }
             }
         },
@@ -139,8 +125,9 @@ export const useMatchStore = defineStore('match', {
                 }
 
                 return { success: true, message: result.message }
-            } catch (error: any) {
-                console.error('Failed to toggle participation', error)
+            } catch (err: unknown) {
+                console.error('Failed to toggle participation', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to update participation' }
             }
         },
@@ -159,8 +146,9 @@ export const useMatchStore = defineStore('match', {
                     this.availablePlayers.sort((a, b) => b.currentRating - a.currentRating)
                 }
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to update rating', error)
+            } catch (err: unknown) {
+                console.error('Failed to update rating', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to update rating' }
             }
         },
@@ -227,7 +215,7 @@ export const useMatchStore = defineStore('match', {
                     }
                 }
 
-                const match = await fetch<any>('/matches', {
+                const match = await fetch<Match>('/matches', {
                     method: 'POST',
                     body: {
                         date: this.matchDate,
@@ -236,18 +224,18 @@ export const useMatchStore = defineStore('match', {
                         allowRatings: this.allowRatings
                     }
                 })
-                if (match && (match.id || match.Id)) {
-                    this.currentMatchId = match.id || match.Id
-                    this.isCompleted = match.isCompleted || match.IsCompleted
-                    // Update format type if returned (e.g. standardized by backend)
-                    if (match.FormatType || match.formatType) {
-                        this.formatType = match.FormatType || match.formatType
+                if (match && match.id) {
+                    this.currentMatchId = match.id
+                    this.isCompleted = match.isCompleted
+                    if (match.formatType) {
+                        this.formatType = match.formatType
                     }
                 }
 
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to save match', error)
+            } catch (err: unknown) {
+                console.error('Failed to save match', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to save match' }
             } finally {
                 this.isLoading = false
@@ -276,25 +264,21 @@ export const useMatchStore = defineStore('match', {
             this.canRate = false
 
             try {
-                const match = await fetch<any>(`/matches/${matchId}`)
+                const match = await fetch<Match>(`/matches/${matchId}`)
                 if (!match) return { success: false }
 
-                this.currentMatchId = match.id || match.Id
-                this.isCompleted = match.isCompleted || match.IsCompleted
+                this.currentMatchId = match.id
+                this.isCompleted = match.isCompleted
                 if (match.allowRatings !== undefined) this.allowRatings = match.allowRatings
-                else if (match.AllowRatings !== undefined) this.allowRatings = match.AllowRatings
-                // Sync match date logic if needed, but we usually drive this by date selection
 
-                if (match.FormatType || match.formatType) {
-                    this.formatType = match.FormatType || match.formatType
+                if (match.formatType) {
+                    this.formatType = match.formatType
 
                     // Try to parse format to populate maxPlayers and teamsCount
                     // e.g. "5v5" -> 2 teams, 10 players
                     if (this.formatType.includes('v')) {
                         const parts = this.formatType.split('v')
                         this.teamsCount = parts.length
-                        // Assume all teams equal size for maxPlayers calculation
-                        // or sum them up
                         this.maxPlayers = parts.reduce((sum: number, p: string) => sum + parseInt(p), 0)
                     }
                 }
@@ -304,23 +288,24 @@ export const useMatchStore = defineStore('match', {
                 let maxTeam = 0
 
                 // Parse assignments
-                if (match.matchAssignments || match.MatchAssignments) {
-                    const assignments = match.matchAssignments || match.MatchAssignments
-                    assignments.forEach((ma: any) => {
-                        const player = ma.player || ma.Player
-                        const pid = player.id || player.Id
+                if (match.matchAssignments) {
+                    match.matchAssignments.forEach((ma: MatchAssignment) => {
+                        const player = ma.player
+                        const pid = ma.playerId
                         newSelectedIds.push(pid)
-                        const teamNum = ma.teamNumber || ma.TeamNumber
-                        if (teamNum > 0) {
+                        const teamNum = ma.teamNumber
+                        if (teamNum > 0 && player) {
                             if (!newTeams[teamNum]) newTeams[teamNum] = []
-                            // Map player data correctly
                             newTeams[teamNum].push({
-                                id: pid,
-                                fullName: player.fullName || player.FullName,
-                                currentRating: player.currentRating || player.CurrentRating,
-                                avgMatchRating: player.avgMatchRating || player.AvgMatchRating,
-                                preferredPosition: player.preferredPosition || player.PreferredPosition,
-                                lastPlayed: player.lastPlayed || player.LastPlayed
+                                id: player.id,
+                                fullName: player.fullName,
+                                currentRating: player.currentRating,
+                                avgMatchRating: player.avgMatchRating,
+                                preferredPosition: player.preferredPosition,
+                                lastPlayed: player.lastPlayed,
+                                identityUserId: player.identityUserId,
+                                role: player.role,
+                                stats: player.stats
                             })
                             if (teamNum > maxTeam) maxTeam = teamNum
                         }
@@ -358,17 +343,16 @@ export const useMatchStore = defineStore('match', {
             this.canRate = false
 
             try {
-                const match = await fetch<any>(`/matches/by-date/${date}`)
+                const match = await fetch<Match>(`/matches/by-date/${date}`)
                 if (!match) return { success: false }
                 this.currentMatchId = match.id
                 this.isCompleted = match.isCompleted
                 if (match.allowRatings !== undefined) this.allowRatings = match.allowRatings
-                else if (match.AllowRatings !== undefined) this.allowRatings = match.AllowRatings
 
-                const returnedDate = (match.date || match.Date)?.split('T')[0]
+                const returnedDate = match.date?.split('T')[0]
 
-                if (match.FormatType || match.formatType) {
-                    this.formatType = match.FormatType || match.formatType
+                if (match.formatType) {
+                    this.formatType = match.formatType
 
                     // Try to parse format to populate maxPlayers and teamsCount
                     if (this.formatType.includes('v')) {
@@ -382,20 +366,24 @@ export const useMatchStore = defineStore('match', {
                 const newSelectedIds: string[] = []
                 let maxTeam = 0
 
-                const assignments = match.matchAssignments || match.MatchAssignments || []
+                const assignments = match.matchAssignments || []
 
-                assignments.forEach((a: any) => {
-                    const playerId = a.playerId || a.PlayerId
-                    const teamNumber = a.teamNumber || a.TeamNumber
-                    const rawPlayer = a.player || a.Player
+                assignments.forEach((a: MatchAssignment) => {
+                    const playerId = a.playerId
+                    const teamNumber = a.teamNumber
+                    const rawPlayer = a.player
 
                     if (playerId) newSelectedIds.push(playerId)
                     if (teamNumber && rawPlayer) {
                         const player: Player = {
-                            id: rawPlayer.id || rawPlayer.Id,
-                            fullName: rawPlayer.fullName || rawPlayer.FullName,
-                            currentRating: rawPlayer.currentRating || rawPlayer.CurrentRating,
-                            preferredPosition: rawPlayer.preferredPosition || rawPlayer.PreferredPosition
+                            id: rawPlayer.id,
+                            fullName: rawPlayer.fullName,
+                            currentRating: rawPlayer.currentRating,
+                            preferredPosition: rawPlayer.preferredPosition,
+                            lastPlayed: rawPlayer.lastPlayed,
+                            identityUserId: rawPlayer.identityUserId,
+                            role: rawPlayer.role,
+                            stats: rawPlayer.stats
                         }
                         if (!newTeams[teamNumber]) newTeams[teamNumber] = []
                         newTeams[teamNumber].push(player)
@@ -413,7 +401,7 @@ export const useMatchStore = defineStore('match', {
                 this.selectedPlayerIds = newSelectedIds
                 this.teams = newTeams
                 this.teamsCount = maxTeam
-                this.formatType = match.formatType || match.FormatType || '5v5'
+                this.formatType = match.formatType || '5v5'
 
                 // Check if user can rate this match
                 if (this.isCompleted && this.currentMatchId) {
@@ -423,8 +411,8 @@ export const useMatchStore = defineStore('match', {
                 }
 
                 return { success: true }
-            } catch (error: any) {
-                if (error.status !== 404) {
+            } catch (error: unknown) {
+                if ((error as { status?: number }).status !== 404) {
                     console.error('Failed to fetch match', error)
                 }
                 // Reset to null if no match (will default to logic elsewhere or remain null)
@@ -455,7 +443,7 @@ export const useMatchStore = defineStore('match', {
         async fetchMe() {
             const { fetch } = useApi()
             try {
-                return await fetch<any>('/players/me')
+                return await fetch<PlayerProfile>('/players/me')
             } catch (error) {
                 console.error('Failed to fetch profile', error)
                 return null
@@ -473,8 +461,9 @@ export const useMatchStore = defineStore('match', {
                 // Refresh local players if needed
                 await this.fetchPlayers()
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to update profile', error)
+            } catch (err: unknown) {
+                console.error('Failed to update profile', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to update profile' }
             } finally {
                 this.isLoading = false
@@ -484,7 +473,7 @@ export const useMatchStore = defineStore('match', {
         async fetchDashboard() {
             const { fetch } = useApi()
             try {
-                return await fetch<any>('/matches/dashboard')
+                return await fetch<DashboardData>('/matches/dashboard')
             } catch (error) {
                 console.error('Failed to fetch dashboard', error)
                 return null
@@ -499,15 +488,16 @@ export const useMatchStore = defineStore('match', {
                     method: 'PATCH'
                 })
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to complete match', error)
+            } catch (err: unknown) {
+                console.error('Failed to complete match', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to complete match' }
             } finally {
                 this.isLoading = false
             }
         },
 
-        async submitRatings(matchId: string, ratings: { subjectId: string, value: number }[]) {
+        async submitRatings(matchId: string, ratings: RawRating[]) {
             const { fetch } = useApi()
             this.isLoading = true
             try {
@@ -516,8 +506,9 @@ export const useMatchStore = defineStore('match', {
                     body: ratings
                 })
                 return { success: true }
-            } catch (error: any) {
-                console.error('Failed to submit ratings', error)
+            } catch (err: unknown) {
+                console.error('Failed to submit ratings', err)
+                const error = err as { data?: { message?: string } }
                 return { success: false, error: error.data?.message || 'Failed to submit ratings' }
             } finally {
                 this.isLoading = false
@@ -527,7 +518,7 @@ export const useMatchStore = defineStore('match', {
         async fetchMyRatings(matchId: string) {
             const { fetch } = useApi()
             try {
-                return await fetch<any[]>(`/matches/${matchId}/my-ratings`)
+                return await fetch<RawRating[]>(`/matches/${matchId}/my-ratings`)
             } catch (error) {
                 console.error('Failed to fetch my ratings', error)
                 return []

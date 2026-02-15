@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Trophy, Medal, Calendar, Award } from 'lucide-vue-next'
+import type { LeaderboardEntry } from '~/types/player'
 
 definePageMeta({
     middleware: 'auth'
@@ -9,7 +10,7 @@ const { token } = useAuth()
 const { currentLeague } = useLeague()
 
 const timeframe = ref('all')
-const leaderboard = ref<any[]>([])
+const leaderboard = ref<LeaderboardEntry[]>([])
 const isLoading = ref(true)
 
 const timeframes = [
@@ -30,7 +31,7 @@ const fetchLeaderboard = async () => {
                 'X-League-Id': currentLeague.value.id
             }
         })
-        leaderboard.value = data as any[]
+        leaderboard.value = data as LeaderboardEntry[]
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error)
     } finally {

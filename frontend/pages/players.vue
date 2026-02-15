@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
+import type { Player } from '~/types/player'
+import type { AuthSessionData } from '~/types/auth'
 import { Users, Star, Calendar, ShieldCheck, ShieldMinus, Search, Edit2, X, Check, Activity, Trophy, Medal, Flame, Clock } from 'lucide-vue-next'
 
 definePageMeta({
@@ -12,7 +14,7 @@ const { data } = useAuth()
 
 const isAdmin = computed(() => {
     // Check for Super Admin
-    if ((data.value as any)?.user?.isSuperAdmin) return true
+    if ((data.value as AuthSessionData | null)?.user?.isSuperAdmin) return true
 
     // Check for League Admin
     return currentLeague.value?.role === 'Admin' || currentLeague.value?.role === 'SuperAdmin'
@@ -38,7 +40,7 @@ const badges = computed(() => {
     const players = store.availablePlayers
 
     // Helper to find IDs with max value
-    const findMaxIds = (getValue: (p: any) => number) => {
+    const findMaxIds = (getValue: (p: Player) => number) => {
         let max = -1
         let ids: string[] = []
         players.forEach(p => {
@@ -67,7 +69,7 @@ watch(currentLeague, async (newLeague) => {
     }
 }, { immediate: true })
 
-const handlePromote = async (player: any) => {
+const handlePromote = async (player: Player) => {
     const confirmed = await modal.showConfirm(
         `Are you sure you want to promote ${player.fullName} to Admin?`,
         'Promote to Admin'
@@ -84,7 +86,7 @@ const handlePromote = async (player: any) => {
     }
 }
 
-const handleDemote = async (player: any) => {
+const handleDemote = async (player: Player) => {
     const confirmed = await modal.showConfirm(
         `Are you sure you want to demote ${player.fullName} to Member?`,
         'Demote to Member'
@@ -99,7 +101,7 @@ const handleDemote = async (player: any) => {
     }
 }
 
-const startEditRating = (player: any) => {
+const startEditRating = (player: Player) => {
     editingPlayerId.value = player.id
     editingRating.value = player.currentRating
 }
@@ -109,7 +111,7 @@ const cancelEditRating = () => {
     editingRating.value = 0
 }
 
-const saveRating = async (player: any) => {
+const saveRating = async (player: Player) => {
     if (editingRating.value < 1 || editingRating.value > 10) {
         modal.showError('Rating must be between 1 and 10')
         return
@@ -123,7 +125,7 @@ const saveRating = async (player: any) => {
     }
 }
 
-const formatDate = (dateString?: string) => {
+const formatDate = (dateString?: string | null) => {
     if (!dateString) return 'Never'
     return new Date(dateString).toLocaleDateString()
 }
@@ -277,7 +279,7 @@ const formatDate = (dateString?: string) => {
                 </div>
 
                 <!-- Demote button - only for admins who are not the current user -->
-                <div v-if="isAdmin && (player.role === 'Admin' || player.role === 'SuperAdmin') && player.id !== (data as any)?.user?.playerId"
+                <div v-if="isAdmin && (player.role === 'Admin' || player.role === 'SuperAdmin') && player.id !== (data as unknown as AuthSessionData | null)?.user?.playerId"
                     class="pt-2 border-t border-white/5 mt-auto">
                     <button @click="handleDemote(player)"
                         class="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 text-xs font-bold transition-all flex items-center justify-center gap-2 group">
