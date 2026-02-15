@@ -37,7 +37,7 @@ onMounted(async () => {
 })
 
 const onLeagueChange = async () => {
-  const league = userLeagues.value.find((l: any) => l.id === selectedLeagueId.value)
+  const league = userLeagues.value.find((l) => l.id === selectedLeagueId.value)
   if (league) {
     setCurrentLeague(league)
     // Navigate to current route to trigger data refresh without full page reload

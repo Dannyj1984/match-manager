@@ -1,9 +1,12 @@
+import type { League } from '~/types/league'
+import type { ApiRequestOptions } from '~/types/api'
+
 export const useApi = () => {
     const { token } = useAuth()
     const config = useRuntimeConfig()
-    const currentLeague = useState<any>('currentLeague')
+    const currentLeague = useState<League | null>('currentLeague')
 
-    const fetch = async <T>(path: string, options: any = {}) => {
+    const fetch = async <T>(path: string, options: ApiRequestOptions = {}) => {
 
         const headers = {
             ...options.headers

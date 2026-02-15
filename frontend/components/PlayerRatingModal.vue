@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useMatchStore } from '@/stores/match'
 import { X, Star, Save, Loader2, CheckCircle2 } from 'lucide-vue-next'
+import type { Player } from '~/types/player'
 
 const props = defineProps<{
     modelValue: boolean
     matchId: string
-    teams: Record<number, any[]>
+    teams: Record<number, Player[]>
     currentPlayerId: string
 }>()
 
@@ -25,7 +26,7 @@ onMounted(async () => {
     const myRatings = await store.fetchMyRatings(props.matchId)
     if (myRatings && myRatings.length > 0) {
         hasRated.value = true
-        myRatings.forEach((r: any) => {
+        myRatings.forEach((r) => {
             existingRatings.value[r.subjectId] = r.value
             ratings.value[r.subjectId] = r.value
         })
@@ -121,7 +122,7 @@ const handleSave = async () => {
                     <div v-for="(players, teamNum) in teams" :key="teamNum" class="space-y-6">
                         <div class="flex items-center gap-4">
                             <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
-                                Team {{ String.fromCharCode(64 + parseInt(teamNum as any)) }}</h3>
+                                Team {{ String.fromCharCode(64 + parseInt(String(teamNum))) }}</h3>
                             <div class="h-px w-full bg-white/5"></div>
                         </div>
 
